@@ -5,9 +5,11 @@
 'QuickSock' is a C++ library built to make UDP network/socket programming faster and easier, while still providing IP-agnostic features. Support is currently IPV4-only. The IPV6 groundwork has already been done, however, it has not been properly tested. The IPV4 backend supports hostname resolution, but the IPV6 backend is a bit different. The current IPV6 backend does support hostname resolution, however, it does not cache results. This approach is inefficient, and will likely be overhauled later on.
 
 ##Getting Started##
-To install QuickLib, you will need to build the source code with your compiler of choice. This varies from platform to platform. For Windows, you should just be able to build the project using MSBuild, or Visual Studio 2013 (Community) itself. Before doing this, however, you'll need to move the header files (Located in each project's "src/Local" folder) to a new folder called "QuickLib"; more specifically, the headers will need to be at "INCLUDE_FOLDER_HERE/QuickLib/PROJECT_NAME_HERE". From there, on Windows, your library files should be located at "LIB_FOLDER_HERE/QuickLib/ARCHITECTURE_HERE"; the files should be 'PROJECT_NAME_HERE.lib'.
+To install QuickLib, you will need to build the source code with your compiler of choice. This varies from platform to platform. For Windows, you should just be able to build the project using MSBuild, or Visual Studio 2013 (Community) itself. Before doing this, however, you'll need to move the header files (Located in each project's **"src/Local"** folder) to a new folder called **"QuickLib"**; more specifically, the headers will need to be at **"INCLUDE_FOLDER_HERE/QuickLib/PROJECT_NAME_HERE"**.
 
 That's basically it, now you can compile the projects. You could also compile the projects using library-specific local-compilation options, if available. QuickSock has the 'QSOCK_LOCAL_BUILD' preprocessor variable for this purpose. That variable will allow you to compile using the 'Local' versions of the headers.
+
+From there, on Windows, your library files should be located at **"LIB_FOLDER_HERE/QuickLib/ARCHITECTURE_HERE"**; the files should be ***"PROJECT_NAME_HERE.lib"***. **The "ARCHITECTURE_HERE"** folder currently has the following pre-defined names as possibilities: "x86", "x64", and "ARM". If your architecture was not listed, then it has not been explicitly described, and is therefore up to the user.
 
 In the event you are compiling full DLLs, and not static-only 'lib' files, please follow the same rules, managing the DLL files as you see fit.
 
