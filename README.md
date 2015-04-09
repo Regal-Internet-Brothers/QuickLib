@@ -7,10 +7,10 @@
 ##Supported Platforms##
 The platforms supported by this library differ between "sub-projects". In the case of 'QuickSock', earlier versions have been tested on a number of *nix-like systems (Windows, Linux, OS X, etc), and support should generally still be there. The latest versions of 'QuickSock' have only been tested for x64 (64-bit) and x86 (32-bit) versions of Windows. Support for the IPV6 backend varies between systems. Extra work for lower-level implementation differences has been done to ensure implied support for most *nix-like systems. If you have trouble compiling for a specific platform, feel free to make an issue/bug report.
 
-##Other##
-Use this library, and any related projects at your own risk. I will only develop these projects when I feel it is necessary.
-
 ##TO DO##
 * Make a super-class for 'QSocket' called "QStream" (Or similar) in order to create a unified system for packet I/O.
 * Get the IPV6 backend working.
 * Add hostname caching (Probably using a 'map') for the IPV6 backend.
+
+##Other##
+Use this library, and any related projects at your own risk. I will only develop these projects when I feel it is necessary.
