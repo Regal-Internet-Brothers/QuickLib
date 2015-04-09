@@ -1,11 +1,22 @@
+// Preprocessor related:
+//#define QSOCK_LOCAL_BUILD
+
 // Includes:
 #include <iostream>
 
 #ifndef QSOCK_MONKEYMODE
-	#include <QuickLib/QuickSock/QuickSock.h>
+	#ifdef QSOCK_LOCAL_BUILD
+		#include "Local/QuickSock.h"
 	
-	#if QSOCK_THROW_EXCEPTIONS
-		#include <QuickLib/QuickSock/Exceptions.h>
+		#if QSOCK_THROW_EXCEPTIONS
+			#include "Local/Exceptions.h"
+		#endif
+	#else
+		#include <QuickLib/QuickSock/QuickSock.h>
+	
+		#if QSOCK_THROW_EXCEPTIONS
+			#include <QuickLib/QuickSock/Exceptions.h>
+		#endif
 	#endif
 #endif
 
