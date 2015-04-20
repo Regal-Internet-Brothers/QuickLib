@@ -1,5 +1,11 @@
 #pragma once
 
+/*
+	NOTES:
+		* DO NOT mix wide and standard STL technologies, unless you're sure it will compile.
+		For example, wide-streams likely won't support 'std::string' as an input.
+*/
+
 // Includes:
 #include <exception>
 #include <iostream>
@@ -18,19 +24,28 @@ namespace quickLib
 
 		// These are used to represent encoded INI data:
 		typedef string INISectionTag;
-		typedef pair<string, string> INIVariable;
-		typedef map<string, string> INISection;
-		typedef map<INISectionTag, INISection> INIVariables;
+		typedef wstring wINISectionTag;
 
 		typedef size_t lineNumber_t;
 
-		// Constant variable(s):
-		const char assignmentSymbol = '=';
-		const char commentSymbol = ';';
-		const char sectionBeginSymbol = '[';
-		const char sectionEndSymbol = ']';
+		// Generic aliases:
+		template <typename strType=string>
+		using INIVariable = pair<strType, strType>;
 
-		const INISectionTag defaultINISection = "global"; // "master";
+		template <typename strType=string>
+		using INISection = map<strType, strType>;
+
+		template <typename strType=INISectionTag>
+		using INIVariables = map<strType, INISection<strType>>;
+
+		// Constant variable(s):
+		enum symbols : INISectionTag::value_type // char
+		{
+			assignmentSymbol = '=',
+			commentSymbol = ';',
+			sectionBeginSymbol = '[',
+			sectionEndSymbol = ']',
+		};
 
 		// Classes:
 		
@@ -45,6 +60,19 @@ namespace quickLib
 				virtual const string message() const throw();
 		};
 
+		class operationUnsupported : public INI_EXCEPTION
+		{
+			public:
+				// Constructor(s):
+				operationUnsupported();
+
+				// Methods:
+				virtual const string message() const throw();
+
+				// This currently acts as a standard-compliant wrapper for the 'message' command.
+				virtual const char* what() const throw() override;
+		};
+
 		class lineError : public INI_EXCEPTION
 		{
 			public:
@@ -53,9 +81,6 @@ namespace quickLib
 
 				// Methods:
 				virtual const string message() const throw() override;
-
-				// This currently acts as a standard-compliant wrapper for the 'message' command.
-				virtual const char* what() const throw() override;
 
 				// Fields:
 				lineNumber_t error_line;
@@ -103,40 +128,113 @@ namespace quickLib
 
 		// Functions:
 
+		// String management:
+
+		// Functions:
+		string wideStringToDefault(const wstring wstr);
+		wstring defaultStringToWide(const string str);
+
+		inline void correctString(const string str, wstring& output)
+		{
+			output = defaultStringToWide(str);
+
+			return;
+		}
+
+		inline void correctString(const wstring wstr, string& output)
+		{
+			output = wideStringToDefault(wstr);
+
+			return;
+		}
+
+		inline void correctString(const string str, string& output)
+		{
+			output = str;
+
+			return;
+		}
+
+		inline void correctString(const wstring wstr, wstring& output)
+		{
+			output = wstr;
+
+			return;
+		}
+
+		inline string abstractStringToDefault(const string str)
+		{
+			return str;
+		}
+
+		inline string abstractStringToDefault(const wstring wstr)
+		{
+			return wideStringToDefault(wstr);
+		}
+
+		inline wstring abstractStringToWide(const wstring wstr)
+		{
+			return wstr;
+		}
+
+		inline wstring abstractStringToWide(const string str)
+		{
+			return defaultStringToWide(str);
+		}
+
 		// This trims a string from the beginning.
-		string ltrim(string s);
+		template <typename str=string>
+		str ltrim(str s);
 
 		// This trims a string in reverse.
-		string rtrim(string s);
+		template <typename str=string>
+		str rtrim(str s);
 
 		// This trims a string from both ends.
-		string trim(string s);
+		template <typename str=string>
+		str trim(str s);
 
-		void load(const string& path, INIVariables& variables);
-		void save(const string& path, const INIVariables& variables, bool insertTrailingSpaces=false);
+		template <typename INIVars=INIVariables<>>
+		void load(const string& path, INIVars& variables);
 
-		void read(istream& is, INIVariables& variables);
-		void write(ostream& os, const INIVariables& variables, bool insertTrailingSpaces=false);
+		template <typename INIVars=INIVariables<>>
+		void save(const string& path, const INIVars& variables, bool insertTrailingSpaces=false);
+
+		template <typename INIVars=INIVariables<>>
+		void load(const wstring& path, INIVars& variables);
+
+		template <typename INIVars=INIVariables<>>
+		void save(const wstring& path, const INIVars& variables, bool insertTrailingSpaces=false);
+
+		template <typename inputStream=istream, typename INIVars=INIVariables<>>
+		void read(inputStream& is, INIVars& variables);
+
+		template <typename outputStream=ostream, typename INIVars=INIVariables<>>
+		void write(outputStream& os, const INIVars& variables, bool insertTrailingSpaces=false);
 
 		// This command reads an INI entry from the specified input-stream.
 		// The return value is the new line-number, based on the input given.
 		// DO NOT call this on an input-stream that has already ended; please handle this yourself.
-		lineNumber_t readEntryFromLines(istream& is, INIVariable& variable, string line, const lineNumber_t currentLineNumber=0, bool skipStreamCheck=true, const char separator=assignmentSymbol, const char commentChar=commentSymbol);
+		template <typename inputStream=istream, typename INIVars=INIVariables<>, typename strType=string>
+		lineNumber_t readEntryFromLines(inputStream& is, INIVars& variable, strType line, const lineNumber_t currentLineNumber=0, bool skipStreamCheck=true, const symbols separator=assignmentSymbol, const symbols commentChar=commentSymbol);
 
-		void flushVariables(INIVariables& variables, INISectionTag& currentSection, INISection& currentEntries);
+		template <typename INIVars=INIVariables<>, typename INISecTag=INISectionTag, typename INISec=INISection<>>
+		void flushVariables(INIVars& variables, INISecTag& currentSection, INISec& currentEntries);
 
-		inline INIVariables load(const string& path)
+		template <typename strType=string, typename INIVars=INIVariables<>>
+		inline INIVars load(const strType& path)
 		{
-			INIVariables output;
+			INIVars output;
 
 			load(path, output);
 
 			return output;
 		}
 
-		inline INIVariables read(istream& is)
+		template <typename inputStream=istream, typename INIVars=INIVariables<basic_string<inputStream::char_type>>>
+		inline INIVars read(inputStream& is)
 		{
-			INIVariables output;
+			INIVars output;
 
 			read(is, output);
 

@@ -1,5 +1,5 @@
 // Preprocessor related:
-#define QSOCK_LOCAL_BUILD
+//#define QSOCK_LOCAL_BUILD
 
 // Includes:
 #include <iostream>

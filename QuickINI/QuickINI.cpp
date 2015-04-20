@@ -8,6 +8,7 @@
 #include <algorithm>
 #include <functional>
 #include <cctype>
+#include <codecvt>
 //#include <locale>
 
 #ifdef QINI_LOCAL_BUILD
@@ -38,6 +39,25 @@ namespace quickLib
 			return (string)what();
 		}
 
+		// operationUnsupported:
+
+		// Constructor(s):
+		operationUnsupported::operationUnsupported() : INI_EXCEPTION()
+		{
+			// Nothing so far.
+		}
+
+		// Methods:
+		const string operationUnsupported::message() const throw()
+		{
+			return (string)"Operation unsupported.";
+		}
+
+		const char* operationUnsupported::what() const throw()
+		{
+			return message().c_str();
+		}
+
 		// lineError:
 
 		// Constructor(s):
@@ -54,11 +74,6 @@ namespace quickLib
 			ss << "Unknown error on line: " << error_line;
 
 			return ss.str();
-		}
-
-		const char* lineError::what() const throw()
-		{
-			return message().c_str();
 		}
 
 		// invalidSegment:
@@ -140,6 +155,21 @@ namespace quickLib
 		}
 
 		// Functions:
+		
+		// String management:
+		string wideStringToDefault(const wstring wstr)
+		{
+			std::wstring_convert<std::codecvt_utf8<wchar_t>> stringConverter;
+
+			return stringConverter.to_bytes(wstr);
+		}
+		
+		wstring defaultStringToWide(const string str)
+		{
+			std::wstring_convert<std::codecvt_utf8<wchar_t>> stringConverter;
+
+			return stringConverter.from_bytes(str);
+		}
 
 		static int isquote(int c)
 		{
@@ -147,7 +177,8 @@ namespace quickLib
 		}
 
 		// String "cleanup" / trimming code by Evan Teran:
-		string ltrim(string s)
+		template <typename str>
+		str ltrim(str s)
 		{
 			s.erase(s.begin(), find_if(s.begin(), s.end(), not1(ptr_fun<int, int>(isspace))));
 			s.erase(s.begin(), find_if(s.begin(), s.end(), not1(ptr_fun<int, int>(isquote))));
@@ -156,7 +187,8 @@ namespace quickLib
 			return s;
 		}
 
-		string rtrim(string s)
+		template <typename str>
+		str rtrim(str s)
 		{
 			s.erase(find_if(s.rbegin(), s.rend(), not1(ptr_fun<int, int>(isspace))).base(), s.end());
 			s.erase(find_if(s.rbegin(), s.rend(), not1(ptr_fun<int, int>(isquote))).base(), s.end());
@@ -165,12 +197,14 @@ namespace quickLib
 			return s;
 		}
 
-		string trim(string s)
+		template <typename str>
+		str trim(str s)
 		{
 			return rtrim(ltrim(s));
 		}
 
-		void load(const string& path, INIVariables& variables)
+		template <typename INIVars>
+		void load(const string& path, INIVars& variables)
 		{
 			ifstream f;
 
@@ -183,7 +217,8 @@ namespace quickLib
 			return;
 		}
 
-		void save(const string& path, const INIVariables& variables, bool insertTrailingSpaces)
+		template <typename INIVars>
+		void save(const string& path, const INIVars& variables, bool insertTrailingSpaces)
 		{
 			ofstream f;
 
@@ -196,22 +231,58 @@ namespace quickLib
 			return;
 		}
 
-		void read(istream& is, INIVariables& variables)
+		template <typename INIVars>
+		void load(const wstring& path, INIVars& variables)
 		{
+			wifstream f;
+
+			f.open(path);
+
+			read(f, variables);
+
+			f.close();
+
+			return;
+		}
+
+		template <typename INIVars>
+		void save(const wstring& path, const INIVars& variables, bool insertTrailingSpaces)
+		{
+			wofstream f;
+
+			f.open(path);
+
+			write(f, variables, insertTrailingSpaces);
+
+			f.close();
+
+			return;
+		}
+
+		template <typename inputStream, typename INIVars>
+		void read(inputStream& is, INIVars& variables)
+		{
+			// Typedefs:
+			typedef INIVars::key_type strType;
+
 			// Local variable(s):
 
 			// The global line-number for this read operation.
 			lineNumber_t lineNumber = 1;
 
 			// The current INI section.
-			INISectionTag currentSection = defaultINISection;
-			INISection currentEntries;
+			strType currentSection;
+
+			// Unfortunately, since function templates are picky, I have to use this.
+			correctString("global", currentSection);
+
+			INISection<strType> currentEntries;
 
 			// Read every line of the file:
 			while (!is.eof())
 			{
 				// Local variable(s):
-				string line;
+				strType line;
 
 				getline(is, line);
 
@@ -219,16 +290,16 @@ namespace quickLib
 					continue;
 
 				auto sectionBegin = line.find(sectionBeginSymbol);
-
+				
 				// Section tags must be on a single line (Currently):
-				if (sectionBegin != string::npos)
+				if (sectionBegin != strType::npos)
 				{
 					auto sectionEnd = line.find(sectionEndSymbol);
 
 					// Ensure this is an actual section-tag:
 					if (line.find(commentSymbol) > sectionEnd && line.find(assignmentSymbol) > sectionEnd)
 					{
-						if (sectionEnd != string::npos)
+						if (sectionEnd != strType::npos)
 						{
 							// Flush the current section, then get the new section-name:
 							flushVariables(variables, currentSection, currentEntries);
@@ -249,7 +320,7 @@ namespace quickLib
 				}
 
 				// The variable-entry we're going to read.
-				INIVariable variable;
+				INIVariable<strType> variable;
 
 				// Read the entry, then add to the line-number.
 				lineNumber = readEntryFromLines(is, variable, line, lineNumber);
@@ -264,15 +335,16 @@ namespace quickLib
 			return;
 		}
 
-		void write(ostream& os, const INIVariables& variables, bool insertTrailingSpaces)
+		template <typename outputStream, typename INIVars>
+		void write(outputStream& os, const INIVars& variables, bool insertTrailingSpaces)
 		{
 			for (auto& section : variables)
 			{
-				os << sectionBeginSymbol << section.first << sectionEndSymbol << endl;
+				os << (char)sectionBeginSymbol << section.first << (char)sectionEndSymbol << endl;
 
 				for (auto& entry : section.second)
 				{
-					os << entry.first << " " << assignmentSymbol << " " << entry.second << endl;
+					os << entry.first << " " << (char)assignmentSymbol << " " << entry.second << endl;
 				}
 
 				if (insertTrailingSpaces)
@@ -284,7 +356,8 @@ namespace quickLib
 			return;
 		}
 
-		lineNumber_t readEntryFromLines(istream& is, INIVariable& variable, string line, const lineNumber_t currentLineNumber, bool skipStreamCheck, const char separator, const char commentChar)
+		template <typename inputStream, typename INIVars, typename strType>
+		lineNumber_t readEntryFromLines(inputStream& is, INIVars& variable, strType line, const lineNumber_t currentLineNumber, bool skipStreamCheck, const symbols separator, const symbols commentChar)
 		{
 			if (!skipStreamCheck && is.eof())
 			{
@@ -293,9 +366,9 @@ namespace quickLib
 
 			// Local variable(s):
 			auto comment = line.find(commentChar);
-				
+			
 			// Check for comments:
-			if (comment != string::npos)
+			if (comment != strType::npos)
 			{
 				// This line is only a comment, ignore it.
 				if (comment == 0)
@@ -311,7 +384,7 @@ namespace quickLib
 
 			auto assignment = line.find(separator);
 
-			if (assignment == string::npos)
+			if (assignment == strType::npos)
 			{
 				variable.first = variable.first + trim(line);
 
@@ -341,17 +414,18 @@ namespace quickLib
 			}
 			else
 			{
-				throw invalidRightOperand(currentLineNumber, variable.first);
+				throw invalidRightOperand(currentLineNumber, abstractStringToDefault(variable.first));
 			}
 
 			return currentLineNumber+1;
 		}
 
-		void flushVariables(INIVariables& variables, INISectionTag& currentSection, INISection& currentEntries)
+		template <typename INIVars, typename INISecTag, typename INISec>
+		void flushVariables(INIVars& variables, INISecTag& currentSection, INISec& currentEntries)
 		{
 			// Insert the new variable into the 'variables' container:
 			variables[currentSection] = currentEntries;
-			currentEntries = INISection(); // currentEntries.clear();
+			currentEntries = INISec(); // currentEntries.clear();
 
 			return;
 		}
@@ -365,11 +439,11 @@ int main()
 	using namespace std;
 	using namespace quickLib;
 
-	string file = "X\t\t\t=Y\nZ=  W\nA = B\nC =D\n[Test]O_O=\"[10, 15, 20, 25]\" ; Hello world.\nLife=42\nYou know what they say         = Hello World ;;;;.";
+	wstring file = L"X\t\t\t=Y\nZ=  W\nA = B\nC =D\n[Test]O_O=\"[10, 15, 20, 25]\" ; Hello world.\nLife=42\nYou know what they say         = Hello World ;;;;.";
 
-	stringstream is(file);
+	wstringstream is(file);
 
-	INI::INIVariables data;
+	INI::INIVariables<wstring> data;
 
 	try
 	{
@@ -377,14 +451,14 @@ int main()
 
 		for (auto& section : data)
 		{
-			cout << "[" << section.first << "]" << endl;
+			wcout << '[' << section.first << ']' << endl;
 
 			for (auto& e : section.second)
 			{
-				cout << '\'' << e.first << '\'' << " = " << '\'' << e.second << '\'' << endl;
+				wcout << '\'' << e.first << '\'' << " = " << '\'' << e.second << '\'' << endl;
 			}
 
-			cout << endl;
+			wcout << endl;
 		}
 	}
 	catch (const INI::INI_EXCEPTION& e)
@@ -398,11 +472,7 @@ int main()
 
 	cout << "------------------------" << endl;
 
-	stringstream os;
-
-	INI::write(os, data, true);
-
-	cout << os.str();
+	INI::write(wcout, data, true);
 
 	system("PAUSE");
 

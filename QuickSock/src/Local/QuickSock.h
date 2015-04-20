@@ -397,7 +397,7 @@ namespace quickLib
 			#endif
 		}
 
-		template<typename T>
+		template <typename T>
 		inline void ZeroVar(T& X)
 		{
 			memset(&X, 0, sizeof(X));
@@ -441,7 +441,7 @@ namespace quickLib
 				// Functions:
 
 				// This will transfer the contents of 'source' to 'destination', using the sub-script operator.
-				template<typename TypeA, typename TypeB = TypeA>
+				template <typename TypeA, typename TypeB = TypeA>
 				static size_type smartTransfer(TypeA source, TypeB destination, size_type count, size_type sourceOffset = 0, size_type destinationOffset = 0)
 				{
 					for (size_type i = 0; i < count; i++)
@@ -819,7 +819,7 @@ namespace quickLib
 				// This command will read the type specified, but it will not
 				// automatically swap the appropriate bytes of the type.
 				// To do this, please use the 'read' command.
-				template<typename type>
+				template <typename type>
 				inline type rawRead()
 				{
 					type data;
@@ -829,7 +829,7 @@ namespace quickLib
 					return data;
 				}
 
-				template<> inline QSOCK_UCHAR rawRead<QSOCK_UCHAR>()
+				template <> inline QSOCK_UCHAR rawRead<QSOCK_UCHAR>()
 				{
 					#ifndef QSOCK_THROW_EXCEPTIONS
 						if (canRead(sizeof(QSOCK_UCHAR)))
@@ -848,12 +848,12 @@ namespace quickLib
 					return 0;
 				}
 
-				template<> inline QSOCK_CHAR rawRead<QSOCK_CHAR>()
+				template <> inline QSOCK_CHAR rawRead<QSOCK_CHAR>()
 				{
 					return (QSOCK_CHAR)rawRead<QSOCK_UCHAR>();
 				}
 
-				template<> inline bool rawRead<bool>()
+				template <> inline bool rawRead<bool>()
 				{
 					return ((rawRead<QSOCK_UCHAR>() != 0) ? true : false);
 				}
@@ -861,38 +861,38 @@ namespace quickLib
 				// This acts as an automatic reading command for the type specified.
 				// When retrieving the data requested, the proper byte-order command will be used.
 				// If the speicfied type isn't directly supported, it will not be automatically byte-swapped.
-				template<typename type> inline type read()
+				template <typename type> inline type read()
 				{
 					return rawRead<type>();
 				}
 
-				template<> inline QSOCK_UINT16 read<QSOCK_UINT16>() { return (fixByteOrder) ? ntohs(rawRead<QSOCK_UINT16>()) : rawRead<QSOCK_UINT16>(); }
-				template<> inline QSOCK_INT16 read<QSOCK_INT16>() { return (QSOCK_INT16)read<QSOCK_UINT16>(); }
+				template <> inline QSOCK_UINT16 read<QSOCK_UINT16>() { return (fixByteOrder) ? ntohs(rawRead<QSOCK_UINT16>()) : rawRead<QSOCK_UINT16>(); }
+				template <> inline QSOCK_INT16 read<QSOCK_INT16>() { return (QSOCK_INT16)read<QSOCK_UINT16>(); }
 
-				template<> inline QSOCK_UINT32_LONG read<QSOCK_UINT32_LONG>()
+				template <> inline QSOCK_UINT32_LONG read<QSOCK_UINT32_LONG>()
 				{
 					return ((fixByteOrder) ? ntohl(rawRead<QSOCK_UINT32_LONG>()) : rawRead<QSOCK_UINT32_LONG>());
 				}
 
-				template<> inline QSOCK_INT32_LONG read<QSOCK_INT32_LONG>() { return (QSOCK_INT32_LONG)read<QSOCK_UINT32_LONG>(); }
+				template <> inline QSOCK_INT32_LONG read<QSOCK_INT32_LONG>() { return (QSOCK_INT32_LONG)read<QSOCK_UINT32_LONG>(); }
 
-				template<> inline QSOCK_UINT32 read<QSOCK_UINT32>() { return (QSOCK_UINT32)read<QSOCK_UINT32_LONG>(); }
-				template<> inline QSOCK_INT32 read<QSOCK_INT32>() { return (QSOCK_INT32)read<QSOCK_INT32_LONG>(); }
+				template <> inline QSOCK_UINT32 read<QSOCK_UINT32>() { return (QSOCK_UINT32)read<QSOCK_UINT32_LONG>(); }
+				template <> inline QSOCK_INT32 read<QSOCK_INT32>() { return (QSOCK_INT32)read<QSOCK_INT32_LONG>(); }
 
-				template<> inline QSOCK_UINT64 read<QSOCK_UINT64>() { return (fixByteOrder) ? ntohll(rawRead<QSOCK_UINT64>()) : rawRead<QSOCK_UINT64>(); }
+				template <> inline QSOCK_UINT64 read<QSOCK_UINT64>() { return (fixByteOrder) ? ntohll(rawRead<QSOCK_UINT64>()) : rawRead<QSOCK_UINT64>(); }
 
-				template<> inline QSOCK_INT64 read<QSOCK_INT64>() { return (QSOCK_INT64)read<QSOCK_UINT64>(); }
+				template <> inline QSOCK_INT64 read<QSOCK_INT64>() { return (QSOCK_INT64)read<QSOCK_UINT64>(); }
 
-				template<> inline QSOCK_FLOAT32 read<QSOCK_FLOAT32>() { return (fixByteOrder) ? ntohf(rawRead<QSOCK_UINT32>()) : rawRead<QSOCK_FLOAT32>(); }
-				template<> inline QSOCK_FLOAT64 read<QSOCK_FLOAT64>() { return (fixByteOrder) ? ntohd(rawRead<QSOCK_UINT64>()) : rawRead<QSOCK_FLOAT64>(); }
+				template <> inline QSOCK_FLOAT32 read<QSOCK_FLOAT32>() { return (fixByteOrder) ? ntohf(rawRead<QSOCK_UINT32>()) : rawRead<QSOCK_FLOAT32>(); }
+				template <> inline QSOCK_FLOAT64 read<QSOCK_FLOAT64>() { return (fixByteOrder) ? ntohd(rawRead<QSOCK_UINT64>()) : rawRead<QSOCK_FLOAT64>(); }
 
-				template<> inline nativeString read<nativeString>()
+				template <> inline nativeString read<nativeString>()
 				{
 					// Read the string's length, then the string itself.
 					return readNativeString(readLengthOfString());
 				}
 
-				template<> inline std::wstring read<std::wstring>()
+				template <> inline std::wstring read<std::wstring>()
 				{
 					auto length = readLengthOfString();
 					auto str = std::wstring((const wchar_t*)simulatedReadBytes(length*sizeof(std::wstring::value_type)), length);
@@ -1138,13 +1138,13 @@ namespace quickLib
 				// This command will write the type specified, but it will not
 				// automatically swap the appropriate bytes of the type.
 				// To do this, please use the 'write' command.
-				template<typename type>
+				template <typename type>
 				inline bool rawWrite(type data)
 				{
 					return writeData(&data, sizeof(type));
 				}
 
-				template<> inline bool rawWrite<QSOCK_UCHAR>(QSOCK_UCHAR data)
+				template <> inline bool rawWrite<QSOCK_UCHAR>(QSOCK_UCHAR data)
 				{
 					#ifndef QSOCK_THROW_EXCEPTIONS
 						if (canWrite(sizeof(data)))
@@ -1166,39 +1166,39 @@ namespace quickLib
 					return false;
 				}
 
-				template<> inline bool rawWrite<QSOCK_CHAR>(QSOCK_CHAR data)
+				template <> inline bool rawWrite<QSOCK_CHAR>(QSOCK_CHAR data)
 				{
 					return rawWrite<QSOCK_UCHAR>((QSOCK_UCHAR)data);
 				}
 
-				template<> inline bool rawWrite<bool>(bool data)
+				template <> inline bool rawWrite<bool>(bool data)
 				{
 					return rawWrite<QSOCK_UCHAR>((data) ? 1 : 0);
 				}
 
-				template<typename type> inline bool write(type data)
+				template <typename type> inline bool write(type data)
 				{
 					return rawWrite<type>(data);
 				}
 
-				template<> inline bool write<QSOCK_UINT16>(QSOCK_UINT16 data) { return (fixByteOrder) ? rawWrite<QSOCK_UINT16>(htons(data)) : rawWrite<QSOCK_UINT16>(data); }
-				template<> inline bool write<QSOCK_INT16>(QSOCK_INT16 data) { return write<QSOCK_UINT16>((QSOCK_UINT16)data); }
+				template <> inline bool write<QSOCK_UINT16>(QSOCK_UINT16 data) { return (fixByteOrder) ? rawWrite<QSOCK_UINT16>(htons(data)) : rawWrite<QSOCK_UINT16>(data); }
+				template <> inline bool write<QSOCK_INT16>(QSOCK_INT16 data) { return write<QSOCK_UINT16>((QSOCK_UINT16)data); }
 
-				template<> inline bool write<QSOCK_UINT32_LONG>(QSOCK_UINT32_LONG data)
+				template <> inline bool write<QSOCK_UINT32_LONG>(QSOCK_UINT32_LONG data)
 				{
 					return ((fixByteOrder) ? rawWrite<QSOCK_UINT32_LONG>(htonl(data)) : rawWrite<QSOCK_UINT32_LONG>(data));
 				}
 
-				template<> inline bool write<QSOCK_INT32_LONG>(QSOCK_INT32_LONG data) { return write<QSOCK_UINT32_LONG>((QSOCK_UINT32_LONG)data); }
+				template <> inline bool write<QSOCK_INT32_LONG>(QSOCK_INT32_LONG data) { return write<QSOCK_UINT32_LONG>((QSOCK_UINT32_LONG)data); }
 
-				template<> inline bool write<QSOCK_UINT32>(QSOCK_UINT32 data) { return write<QSOCK_UINT32_LONG>((QSOCK_UINT32_LONG)data); }
-				template<> inline bool write<QSOCK_INT32>(QSOCK_INT32 data) { return write<QSOCK_INT32_LONG>((QSOCK_INT32_LONG)data); }
+				template <> inline bool write<QSOCK_UINT32>(QSOCK_UINT32 data) { return write<QSOCK_UINT32_LONG>((QSOCK_UINT32_LONG)data); }
+				template <> inline bool write<QSOCK_INT32>(QSOCK_INT32 data) { return write<QSOCK_INT32_LONG>((QSOCK_INT32_LONG)data); }
 
-				template<> inline bool write<QSOCK_UINT64>(QSOCK_UINT64 data) { return rawWrite<QSOCK_UINT64>((fixByteOrder) ? htonll(data) : data); }
-				template<> inline bool write<QSOCK_INT64>(QSOCK_INT64 data) { return write<QSOCK_UINT64>((QSOCK_UINT64)data); }
+				template <> inline bool write<QSOCK_UINT64>(QSOCK_UINT64 data) { return rawWrite<QSOCK_UINT64>((fixByteOrder) ? htonll(data) : data); }
+				template <> inline bool write<QSOCK_INT64>(QSOCK_INT64 data) { return write<QSOCK_UINT64>((QSOCK_UINT64)data); }
 
-				template<> inline bool write<QSOCK_FLOAT32>(QSOCK_FLOAT32 data) { return (fixByteOrder) ? write<QSOCK_UINT32>(htonf(data)) : rawWrite<QSOCK_FLOAT32>(data); }
-				template<> inline bool write<QSOCK_FLOAT64>(QSOCK_FLOAT64 data) { return (fixByteOrder) ? write<QSOCK_UINT64>(htond(data)) : rawWrite<QSOCK_FLOAT64>(data); }
+				template <> inline bool write<QSOCK_FLOAT32>(QSOCK_FLOAT32 data) { return (fixByteOrder) ? write<QSOCK_UINT32>(htonf(data)) : rawWrite<QSOCK_FLOAT32>(data); }
+				template <> inline bool write<QSOCK_FLOAT64>(QSOCK_FLOAT64 data) { return (fixByteOrder) ? write<QSOCK_UINT64>(htond(data)) : rawWrite<QSOCK_FLOAT64>(data); }
 
 				inline bool writeLengthOfString(size_type length)
 				{
@@ -1223,7 +1223,7 @@ namespace quickLib
 					return writeNativeString(str.c_str(), (uqint)length);
 				}
 
-				template<> inline bool write<nativeString>(nativeString str)
+				template <> inline bool write<nativeString>(nativeString str)
 				{
 					return write(str, lengthOfString(str));
 				}
@@ -1235,7 +1235,7 @@ namespace quickLib
 					return writeData(wstr.c_str(), length*sizeof(std::wstring::value_type));
 				}
 
-				template<> inline bool write<std::wstring>(std::wstring wstr)
+				template <> inline bool write<std::wstring>(std::wstring wstr)
 				{
 					return write(wstr, lengthOfString(wstr));
 				}
@@ -1375,7 +1375,7 @@ namespace quickLib
 				#endif
 
 				// Operators (This class is still not standard I/O stream compliant):
-				template<typename T>
+				template <typename T>
 				inline const QSocket& operator<<(T data)
 				{
 					write<T>(data);
@@ -1383,7 +1383,7 @@ namespace quickLib
 					return *this;
 				}
 
-				template<typename T>
+				template <typename T>
 				inline const QSocket& operator>>(T& outputVariable)
 				{
 					outputVariable = read<T>();
