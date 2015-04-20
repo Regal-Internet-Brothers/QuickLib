@@ -1,5 +1,5 @@
 // Preprocessor related:
-//#define QSOCK_LOCAL_BUILD
+#define QSOCK_LOCAL_BUILD
 
 // Includes:
 #include <iostream>
@@ -108,33 +108,36 @@ namespace quickLib
 		// QSOCK_OUT_OF_BOUNDS_EXCEPTION:
 
 		// Constructor(s):
-		QSOCK_OUT_OF_BOUNDS_EXCEPTION::QSOCK_OUT_OF_BOUNDS_EXCEPTION(const QSocket* target, void* targetedBuffer, size_t bufferSize, size_t offsetInBuffer)
+		QSOCK_OUT_OF_BOUNDS_EXCEPTION::QSOCK_OUT_OF_BOUNDS_EXCEPTION(const QSocket* target, void* targetedBuffer, size_type bufferSize, size_type offsetInBuffer)
 			: QSOCK_EXCEPTION(target), buffer(targetedBuffer), sizeofBuffer(bufferSize), relativePosition(offsetInBuffer) { /* Nothing so far. */ }
 
 		// QSOCK_SEEK_EXCEPTION:
 
 		// Constructor(s):
-		QSOCK_SEEK_EXCEPTION::QSOCK_SEEK_EXCEPTION(const QSocket* target, size_t bufferSize, size_t offsetInBuffer, seekMode mode, void* targetedBuffer)
+		QSOCK_SEEK_EXCEPTION::QSOCK_SEEK_EXCEPTION(const QSocket* target, size_type bufferSize, size_type offsetInBuffer, seekMode mode, void* targetedBuffer)
 			: QSOCK_OUT_OF_BOUNDS_EXCEPTION(target, targetedBuffer, bufferSize, offsetInBuffer) { /* Nothing so far. */ }
 
-		QSOCK_SEEK_EXCEPTION::QSOCK_SEEK_EXCEPTION(const QSocket* target, seekMode mode, size_t position)
-			: QSOCK_OUT_OF_BOUNDS_EXCEPTION(target,
+		QSOCK_SEEK_EXCEPTION::QSOCK_SEEK_EXCEPTION(const QSocket* target, seekMode mode, size_type position)
+			: QSOCK_OUT_OF_BOUNDS_EXCEPTION
+			(
+				target,
 				(mode == SEEK_MODE_IN) ?
 					(target->inbuffer) : (target->outbuffer),
 				(mode == SEEK_MODE_IN) ?
 					(target->inbufferlen) : (target->outbufferlen),
-				position) { /* Nothing so far. */ }
+				position
+			) { /* Nothing so far. */ }
 
 		// QSOCK_READ_EXCEPTION:
 
 		// Constructor(s):
-		QSOCK_READ_EXCEPTION::QSOCK_READ_EXCEPTION(const QSocket* target, void* targetedBuffer, size_t bufferSize, size_t offsetInBuffer)
+		QSOCK_READ_EXCEPTION::QSOCK_READ_EXCEPTION(const QSocket* target, void* targetedBuffer, size_type bufferSize, size_type offsetInBuffer)
 			: QSOCK_OUT_OF_BOUNDS_EXCEPTION(target, targetedBuffer, bufferSize, offsetInBuffer) { /* Nothing so far. */ }
 
 		// QSOCK_WRITE_EXCEPTION:
 
 		// Constructor(s):
-		QSOCK_WRITE_EXCEPTION::QSOCK_WRITE_EXCEPTION(const QSocket* target, void* targetedBuffer, size_t bufferSize, size_t offsetInBuffer)
+		QSOCK_WRITE_EXCEPTION::QSOCK_WRITE_EXCEPTION(const QSocket* target, void* targetedBuffer, size_type bufferSize, size_type offsetInBuffer)
 			: QSOCK_OUT_OF_BOUNDS_EXCEPTION(target, targetedBuffer, bufferSize, offsetInBuffer) { /* Nothing so far. */ }
 
 		// QSocket:
@@ -155,7 +158,7 @@ namespace quickLib
 		// Constuctors & Destructors:
 
 		// This command sets up an object(Usually called by the constructor):
-		bool QSocket::setupObject(size_t bufferLength, bool fixBOrder)
+		bool QSocket::setupObject(size_type bufferLength, bool fixBOrder)
 		{
 			#if defined(QSOCK_AUTOINIT_SOCKETS)
 				if (!initSockets())
@@ -246,7 +249,7 @@ namespace quickLib
 			return true;
 		}
 
-		QSocket::QSocket(size_t bufferlen, bool fixByteOrder)
+		QSocket::QSocket(size_type bufferlen, bool fixByteOrder)
 		{
 			// Ensure we're not using Monkey:
 			#ifndef QSOCK_MONKEYMODE
@@ -266,7 +269,7 @@ namespace quickLib
 
 		// Functions:
 
-		bool QSocket::initSockets(size_t bufferlen)
+		bool QSocket::initSockets(size_type bufferlen)
 		{
 			// Namespace(s):
 			using namespace std;
@@ -850,7 +853,7 @@ namespace quickLib
 			}
 			else
 			{
-				// Unfortunately, this has to be an 'int', instead of a 'size_t'.
+				// Unfortunately, this has to be an 'int', instead of a 'size_type'.
 				int socketAddress_Length = (int)sizeof(socketAddress);
 
 				response = (recvfrom(_socket, (QSOCK_CHAR*)inbuffer, (int)_bufferlen, 0, (sockaddr*)&si_Destination, &socketAddress_Length));
@@ -935,7 +938,7 @@ namespace quickLib
 				using namespace std;
 		
 				// Local variable(s):
-				//size_t outputLength(0);
+				//size_type outputLength(0);
 				//void* dataPosition = nullptr;
 
 				// Allocate the needed c-string(s).
@@ -1015,7 +1018,7 @@ namespace quickLib
 		}
 
 		// The generic reading command for raw data ('size' is in bytes):
-		bool QSocket::readData(void* output, size_t size, size_t output_offset, bool checkRead)
+		bool QSocket::readData(void* output, size_type size, size_type output_offset, bool checkRead)
 		{
 			// Ensure we can read more of the internal buffer:
 			#ifndef QSOCK_THROW_EXCEPTIONS
@@ -1029,7 +1032,7 @@ namespace quickLib
 					inSeekForward(size);
 					
 					// Transfer from the input-buffer to the output.
-					size_t transferred = rawTransfer(inbuffer, output, size, currentOffset, output_offset);
+					size_type transferred = rawTransfer(inbuffer, output, size, currentOffset, output_offset);
 
 					return (transferred == size); // true;
 				}
@@ -1038,12 +1041,12 @@ namespace quickLib
 			return false;
 		}
 
-		bool QSocket::UreadBytes(uqchar* output, size_t count, size_t output_offset, bool checkRead)
+		bool QSocket::UreadBytes(uqchar* output, size_type count, size_type output_offset, bool checkRead)
 		{
 			return readData(output, (count == 0) ? inBytesLeft() : count, output_offset, checkRead);
 		}
 
-		uqchar* QSocket::UreadBytes(size_t count, bool zero_ended)
+		uqchar* QSocket::UreadBytes(size_type count, bool zero_ended)
 		{
 			if (!canRead(count))
 				return nullptr;
@@ -1082,7 +1085,7 @@ namespace quickLib
 			QSOCK_UINT32 strLen = 0;
 			uqchar* bytePosition = nullptr;
 
-			for (size_t index = readOffset; index < inbufferlen; index++)
+			for (size_type index = readOffset; index < inbufferlen; index++)
 			{
 				bytePosition = inbuffer+index;
 		
@@ -1254,7 +1257,7 @@ namespace quickLib
 		// Buffer-writing related:
 
 		// The generic writing command for raw data ('size' is in bytes):
-		bool QSocket::writeData(const void* input, size_t size, size_t input_offset)
+		bool QSocket::writeData(const void* input, size_type size, size_type input_offset)
 		{
 			// Ensure we can write more into the internal buffer:
 			#ifndef QSOCK_THROW_EXCEPTIONS
@@ -1268,7 +1271,7 @@ namespace quickLib
 					outSeekForward(size);
 
 					// Transfer from the input to the output-buffer.
-					size_t transferred = rawTransfer(input, outbuffer, size, input_offset, currentOffset);
+					size_type transferred = rawTransfer(input, outbuffer, size, input_offset, currentOffset);
 
 					return (transferred == size); // true;
 				}
@@ -1277,10 +1280,10 @@ namespace quickLib
 			return false;
 		}
 
-		bool QSocket::writeBytes(const qchar* data, size_t dataSize) { return writeData(data, (dataSize == 0) ? strlen((const QSOCK_CHAR*)data) : dataSize); }
-		bool QSocket::UwriteBytes(const uqchar* data, size_t dataSize) { return writeData(data, (dataSize == 0) ? strlen((const QSOCK_CHAR*)data) : dataSize); }
+		bool QSocket::writeBytes(const qchar* data, size_type dataSize) { return writeData(data, (dataSize == 0) ? strlen((const QSOCK_CHAR*)data) : dataSize); }
+		bool QSocket::UwriteBytes(const uqchar* data, size_type dataSize) { return writeData(data, (dataSize == 0) ? strlen((const QSOCK_CHAR*)data) : dataSize); }
 
-		bool QSocket::padBytes(size_t amount)
+		bool QSocket::padBytes(size_type amount)
 		{
 			if (amount == 0)
 			{
@@ -1302,7 +1305,7 @@ namespace quickLib
 		}
 
 		// Line related:
-		bool QSocket::writeLine(const QSOCK_CHAR* strIn, size_t length)
+		bool QSocket::writeLine(const QSOCK_CHAR* strIn, size_type length)
 		{
 			// Definition(s):
 			bool response = false;

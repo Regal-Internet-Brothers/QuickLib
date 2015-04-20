@@ -55,4 +55,18 @@
 	//typedef QSOCK_DOUBLEX2 QSOCK_DOUBLE_DOUBLE;
 	//typedef unsigned QSOCK_DOUBLEX2 QSOCK_UDOUBLE_DOUBLE;
 	//typedef unsigned QSOCK_DOUBLEX2 QSOCK_UDOUBLEX2;
+
+	// Namespace(s):
+	namespace quickLib
+	{
+		namespace sockets
+		{
+			// Typedefs/aliases:
+			#if !defined(QSOCK_MONKEYMODE)
+				typedef size_t size_type;
+			#else
+				typedef int size_type;
+			#endif
+		}
+	}
 #endif

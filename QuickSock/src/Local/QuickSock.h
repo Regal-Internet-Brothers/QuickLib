@@ -326,7 +326,7 @@ namespace quickLib
 		socketAddress;
 
 		// The type used for stream locations/offset.
-		typedef size_t streamLocation;
+		typedef size_type streamLocation;
 
 		// Functions:
 
@@ -428,7 +428,7 @@ namespace quickLib
 				static const QSOCK_INT32_LONG TIMEOUT_SEC = 0;
 
 				// The default max buffer-length for sockets.
-				static const size_t DEFAULT_BUFFERLEN = 1024;
+				static const size_type DEFAULT_BUFFERLEN = 1024;
 
 				// A global boolean stating if sockets have been initialized or not.
 				static bool socketsInitialized;
@@ -442,32 +442,32 @@ namespace quickLib
 
 				// This will transfer the contents of 'source' to 'destination', using the sub-script operator.
 				template<typename TypeA, typename TypeB = TypeA>
-				static size_t smartTransfer(TypeA source, TypeB destination, size_t count, size_t sourceOffset = 0, size_t destinationOffset = 0)
+				static size_type smartTransfer(TypeA source, TypeB destination, size_type count, size_type sourceOffset = 0, size_type destinationOffset = 0)
 				{
-					for (size_t i = 0; i < count; i++)
+					for (size_type i = 0; i < count; i++)
 						source[i + sourceOffset] = destination[i + destinationOffset];
 
 					return count;
 				}
 
 				// The return value of this command is the number of bytes transferred.
-				static size_t rawTransfer(const void* source, void* destination, size_t count, size_t sourceOffsetInBytes=0, size_t destinationOffsetInBytes=0)
+				static size_type rawTransfer(const void* source, void* destination, size_type count, size_type sourceOffsetInBytes=0, size_type destinationOffsetInBytes=0)
 				{
 					memcpy((uqchar*)destination + destinationOffsetInBytes, (const uqchar*)source + sourceOffsetInBytes, count);
 
 					return count;
 				}
 
-				static size_t lengthOfString(nativeString s)
+				static size_type lengthOfString(nativeString s)
 				{
 					#if !defined(QSOCK_MONKEYMODE)
 						return s.size();
 					#else
-						return (size_t)s.Length();
+						return (size_type)s.Length();
 					#endif
 				}
 
-				static size_t lengthOfString(std::wstring wstr)
+				static size_type lengthOfString(std::wstring wstr)
 				{
 					return wstr.length();
 				}
@@ -529,7 +529,7 @@ namespace quickLib
 				}
 
 				// Constructors & Destructors:
-				QSocket(size_t bufferLength=0, bool fixByteOrder=true);
+				QSocket(size_type bufferLength=0, bool fixByteOrder=true);
 				~QSocket();
 
 				// Fields (Public):
@@ -539,9 +539,9 @@ namespace quickLib
 				uqchar* outbuffer;
 
 				// The length variables for each buffer:
-				size_t _bufferlen;
-				size_t inbufferlen;
-				size_t outbufferlen;
+				size_type _bufferlen;
+				size_type inbufferlen;
+				size_type outbufferlen;
 
 				// The read & write offsets:
 				streamLocation readOffset;
@@ -553,7 +553,7 @@ namespace quickLib
 				bool fixByteOrder;
 
 				// Functions (Public):
-				static bool initSockets(size_t bufferlen=DEFAULT_BUFFERLEN);
+				static bool initSockets(size_type bufferlen=DEFAULT_BUFFERLEN);
 				static bool deinitSockets();
 
 				// Methods (Public):
@@ -669,14 +669,14 @@ namespace quickLib
 				}
 
 				// General purpose:
-				inline bool canRead(size_t count) const
+				inline bool canRead(size_type count) const
 				{
-					return ((count != 0) && (((size_t)readOffset) + count) <= inbufferlen);
+					return ((count != 0) && (((size_type)readOffset) + count) <= inbufferlen);
 				}
 
-				inline bool canWrite(size_t count) const
+				inline bool canWrite(size_type count) const
 				{
-					return ((count != 0) && (((size_t)writeOffset) + count) <= _bufferlen);
+					return ((count != 0) && (((size_type)writeOffset) + count) <= _bufferlen);
 				}
 
 				inline bool canRead() const
@@ -689,14 +689,14 @@ namespace quickLib
 					return (writeOffset < _bufferlen);
 				}
 
-				size_t inBytesLeft() const
+				size_type inBytesLeft() const
 				{
-					return (inbufferlen - (size_t)readOffset);
+					return (inbufferlen - (size_type)readOffset);
 				}
 
-				size_t outBytesLeft() const
+				size_type outBytesLeft() const
 				{
-					return (_bufferlen - (size_t)writeOffset);
+					return (_bufferlen - (size_type)writeOffset);
 				}
 
 				// This command will not "zero out" the internal input-buffer.
@@ -721,7 +721,7 @@ namespace quickLib
 
 				// This command will safely flush a region of the input-buffer.
 				// This is useful when seeking around the input "stream".
-				inline void flushInputRegion(streamLocation position, size_t amount)
+				inline void flushInputRegion(streamLocation position, size_type amount)
 				{
 					if (position+amount > inbufferlen)
 						amount = (inbufferlen-position);
@@ -732,7 +732,7 @@ namespace quickLib
 				}
 
 				// This will "flush" the amount specified, starting at the current input-offset.
-				inline void flushInputRegion(size_t amount)
+				inline void flushInputRegion(size_type amount)
 				{
 					memset(inbuffer + readOffset, 0, amount);
 
@@ -750,7 +750,7 @@ namespace quickLib
 				// This will set the input-length to the length specified.
 				// The input-offset will be changed to the
 				// length specified if it was out of bounds.
-				inline void setInputLength(size_t length)
+				inline void setInputLength(size_type length)
 				{
 					inbufferlen = min(length, inbufferlen);
 					readOffset = min(readOffset, inbufferlen);
@@ -758,7 +758,7 @@ namespace quickLib
 					return;
 				}
 
-				inline size_t inSeek(streamLocation position=0)
+				inline size_type inSeek(streamLocation position=0)
 				{
 					if (position > inbufferlen)
 					{
@@ -814,7 +814,7 @@ namespace quickLib
 				// This command resets the write-offset to the default/zero.
 				inline void resetWrite() { outSeek(0); return; }
 
-				bool readData(void* output, size_t size, size_t output_offset = 0, bool checkRead = true);
+				bool readData(void* output, size_type size, size_type output_offset = 0, bool checkRead = true);
 
 				// This command will read the type specified, but it will not
 				// automatically swap the appropriate bytes of the type.
@@ -915,9 +915,9 @@ namespace quickLib
 
 				inline nativePort readPort() { return read<nativePort>(); }
 
-				inline size_t readLengthOfString()
+				inline size_type readLengthOfString()
 				{
-					return (size_t)read<uqshort>();
+					return (size_type)read<uqshort>();
 				}
 
 				inline nativeIP readIP()
@@ -945,16 +945,16 @@ namespace quickLib
 				// This overload returns 'true' if operations were successful.
 				// The 'checkRead' argument is generally reserved, and should not be used externally.
 				// This is not enforced, but please take safety into account before using it.
-				bool UreadBytes(uqchar* output, size_t count, size_t output_offset = 0, bool checkRead = true);
+				bool UreadBytes(uqchar* output, size_type count, size_type output_offset = 0, bool checkRead = true);
 
 				// This overload of 'UreadBytes' produces a new 'uqchar' array, this array should be managed/deleted by the caller.
 				// If an array was not produced, reading could not be done.
-				uqchar* UreadBytes(size_t count=0, bool zero_ended=false);
+				uqchar* UreadBytes(size_type count=0, bool zero_ended=false);
 
 				// Like 'UreadBytes', 'readBytes' produces a new 'qchar' array, and should be managed/deleted by the caller.
-				qchar* readBytes(size_t count=0, bool zero_ended=false) { return (qchar*)UreadBytes(count, zero_ended); }
+				qchar* readBytes(size_type count=0, bool zero_ended=false) { return (qchar*)UreadBytes(count, zero_ended); }
 
-				inline bool readBytes(uqchar* output, size_t count, size_t output_offset = 0)
+				inline bool readBytes(uqchar* output, size_type count, size_type output_offset = 0)
 				{
 					return UreadBytes(output, count, output_offset);
 				}
@@ -972,7 +972,7 @@ namespace quickLib
 					Seeking should work without any problems.
 				*/
 
-				inline uqchar* simulatedUReadBytes(size_t count=0)
+				inline uqchar* simulatedUReadBytes(size_type count=0)
 				{
 					// Check for errors:
 					if (count == 0 && !canRead(inBytesLeft()) || !canRead(count))
@@ -988,12 +988,12 @@ namespace quickLib
 
 				// This command simply wraps 'simulatedUReadBytes',
 				// please read that command's documentation.
-				inline qchar* simulatedReadBytes(size_t count = 0)
+				inline qchar* simulatedReadBytes(size_type count = 0)
 				{
 					return (qchar*)simulatedUReadBytes(count);
 				}
 
-				inline nativeString readNativeString(size_t length=0)
+				inline nativeString readNativeString(size_type length=0)
 				{
 					const char* characters = (char*)(inbuffer + readOffset);
 
@@ -1009,7 +1009,7 @@ namespace quickLib
 					return read<nativeString>();
 				}
 
-				inline nativeString readString(size_t length)
+				inline nativeString readString(size_type length)
 				{
 					return readNativeString(length);
 				}
@@ -1087,7 +1087,7 @@ namespace quickLib
 
 				// This command will safely flush a region of the output-buffer.
 				// This is useful when seeking around the output "stream".
-				inline void flushOutputRegion(streamLocation position, size_t amount)
+				inline void flushOutputRegion(streamLocation position, size_type amount)
 				{
 					if (position+amount > _bufferlen)
 						amount = (_bufferlen-position);
@@ -1098,7 +1098,7 @@ namespace quickLib
 				}
 
 				// This will "flush" the amount specified, starting at the current write-offset.
-				inline void flushOutputRegion(size_t amount)
+				inline void flushOutputRegion(size_type amount)
 				{
 					memset(outbuffer + writeOffset, 0, amount);
 
@@ -1133,7 +1133,7 @@ namespace quickLib
 				}
 		
 				// The generic writing command for raw data. ('size' is in bytes)
-				bool writeData(const void* input, size_t size, size_t input_offset=0);
+				bool writeData(const void* input, size_type size, size_type input_offset=0);
 
 				// This command will write the type specified, but it will not
 				// automatically swap the appropriate bytes of the type.
@@ -1200,7 +1200,7 @@ namespace quickLib
 				template<> inline bool write<QSOCK_FLOAT32>(QSOCK_FLOAT32 data) { return (fixByteOrder) ? write<QSOCK_UINT32>(htonf(data)) : rawWrite<QSOCK_FLOAT32>(data); }
 				template<> inline bool write<QSOCK_FLOAT64>(QSOCK_FLOAT64 data) { return (fixByteOrder) ? write<QSOCK_UINT64>(htond(data)) : rawWrite<QSOCK_FLOAT64>(data); }
 
-				inline bool writeLengthOfString(size_t length)
+				inline bool writeLengthOfString(size_type length)
 				{
 					return write<uqshort>((uqshort)length);
 				}
@@ -1215,7 +1215,7 @@ namespace quickLib
 					return writeLengthOfString(lengthOfString(wstr));
 				}
 
-				inline bool write(nativeString str, size_t length)
+				inline bool write(nativeString str, size_type length)
 				{
 					// Write the string and its length:
 					writeLengthOfString(length);
@@ -1228,7 +1228,7 @@ namespace quickLib
 					return write(str, lengthOfString(str));
 				}
 
-				inline bool write(std::wstring wstr, size_t length)
+				inline bool write(std::wstring wstr, size_type length)
 				{
 					writeLengthOfString(length);
 
@@ -1270,13 +1270,13 @@ namespace quickLib
 				inline bool writeFloat(qfloat data) { return write<qfloat>(data); }
 				inline bool writeDouble(qdouble data) { return write<qdouble>(data); }
 		
-				bool UwriteBytes(const uqchar* data, size_t dataSize=0);
-				bool writeBytes(const qchar* data, size_t dataSize=0);
+				bool UwriteBytes(const uqchar* data, size_type dataSize=0);
+				bool writeBytes(const qchar* data, size_type dataSize=0);
 
 				// This will "pad" the output by the amount specified.
 				// This generally means inserting zeroes. To do this
 				// with fewer safety checks, use 'flushOutputRegion'.
-				bool padBytes(size_t amount=0);
+				bool padBytes(size_type amount=0);
 
 				// Other types:
 
@@ -1294,7 +1294,7 @@ namespace quickLib
 					return write<nativeString>(str);
 				}
 
-				inline bool writeString(nativeString str, size_t length)
+				inline bool writeString(nativeString str, size_type length)
 				{
 					return write(str, length);
 				}
@@ -1304,13 +1304,13 @@ namespace quickLib
 					return write<std::wstring>(wstr);
 				}
 
-				inline bool writeWideString(std::wstring wstr, size_t length)
+				inline bool writeWideString(std::wstring wstr, size_type length)
 				{
 					return write(wstr, length);
 				}
 
 				// Standard-line related:
-				bool writeLine(const QSOCK_CHAR* strIn, size_t length=0);
+				bool writeLine(const QSOCK_CHAR* strIn, size_type length=0);
 
 				inline bool writeLine(std::string str) { return writeLine(str.c_str(), str.length()); }
 				inline bool writestdLine(std::string str) { return writeLine(str); }
@@ -1402,7 +1402,7 @@ namespace quickLib
 
 				inline bool setupDestination(socketAddress* outboundAddress)
 				{
-					static const size_t socketAddress_Length = sizeof(socketAddress);
+					static const size_type socketAddress_Length = sizeof(socketAddress);
 
 					memcpy(&so_Destination, outboundAddress+socketAddress_Length, socketAddress_Length);
 
@@ -1433,7 +1433,7 @@ namespace quickLib
 				static fd_set fd;
 
 				// Constructors & Destructors:
-				bool setupObject(size_t bufferLength=0, bool fixByteOrder=true);
+				bool setupObject(size_type bufferLength=0, bool fixByteOrder=true);
 				bool freeObject();
 
 				// Methods (Protected):
