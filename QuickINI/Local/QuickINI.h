@@ -75,6 +75,89 @@ namespace quickLib
 				}
 		};
 
+		template<typename characterType=char, typename characterTraits=char_traits<characterType>, typename strAlloc=allocator<characterType>>
+		class fileException : public INI_EXCEPTION
+		{
+			public:
+				// Typedefs:
+				typedef basic_string<characterType, characterTraits, strAlloc> strType;
+				typedef basic_stringstream<characterType, characterTraits, strAlloc> strStream;
+
+				// Fields:
+				const strType file_path;
+
+				// Constructor(s):
+				fileException(const strType path) : INI_EXCEPTION(), file_path(path) { /* Nothing so far. */ }
+
+				// Methods:
+				virtual const strType native_message() const throw()
+				{
+					strStream ss;
+
+					strType str;
+
+					correctString("Unknown file exception: ", str);
+
+					ss << str << file_path;
+
+					return ss.str();
+				}
+
+				virtual const string message() const throw() override
+				{
+					return abstractStringToDefault(native_message());
+				}
+
+				virtual const char* what() const throw() override
+				{
+					return "QuickINI: File exception.";
+				}
+		};
+
+		template<typename characterType=char, typename characterTraits=char_traits<characterType>, typename strAlloc=allocator<characterType>>
+		class fileNotFound : public fileException<characterType, characterTraits, strAlloc>
+		{
+			public:
+				// Constructor(s):
+				fileNotFound(const strType path) : fileException(path) { /* Nothing so far. */ }
+
+				// Methods:
+				virtual const strType native_message() const throw()
+				{
+					strStream ss;
+
+					strType str;
+
+					correctString("File not found: ", str);
+
+					ss << str << file_path;
+
+					return ss.str();
+				}
+		};
+
+		template<typename characterType=char, typename characterTraits=char_traits<characterType>, typename strAlloc=allocator<characterType>>
+		class invalidWriteOperation : public fileException<characterType, characterTraits, strAlloc>
+		{
+			public:
+				// Constructor(s):
+				invalidWriteOperation(const strType path) : fileException(path) { /* Nothing so far. */ }
+
+				// Methods:
+				virtual const strType native_message() const throw()
+				{
+					strStream ss;
+
+					strType str;
+
+					correctString("Invalid write operation: ", str);
+
+					ss << str << file_path;
+
+					return ss.str();
+				}
+		};
+
 		class operationUnsupported : public INI_EXCEPTION
 		{
 			public:
@@ -90,7 +173,7 @@ namespace quickLib
 				// This currently acts as a standard-compliant wrapper for the 'message' command.
 				virtual const char* what() const throw() override
 				{
-					return message().c_str();
+					return "QuickINI: Operation unsupported.";
 				}
 		};
 
@@ -409,14 +492,11 @@ namespace quickLib
 
 			INISection<strType> currentEntries;
 
-			// Read every line of the file:
-			while (!is.eof())
-			{
-				// Local variable(s):
-				strType line;
-				
-				getline<characterType, characterTraits, allocator<characterType>>(is, line);
+			strType line;
 
+			// Read every line of the file:
+			while (getline(is, line))
+			{
 				if (line.empty())
 					continue;
 
@@ -491,9 +571,16 @@ namespace quickLib
 		{
 			ifstream f;
 
-			f.exceptions(ifstream::failbit | ifstream::badbit);
+			//f.exceptions(ifstream::failbit | ifstream::badbit);
 
 			f.open(path);
+
+			if (f.fail())
+			{
+				throw fileNotFound<string::value_type>(path);
+
+				return;
+			}
 
 			read(f, variables);
 
@@ -506,9 +593,16 @@ namespace quickLib
 		{
 			ofstream f;
 			
-			f.exceptions(ofstream::failbit | ofstream::badbit);
+			//f.exceptions(ofstream::failbit | ofstream::badbit);
 
 			f.open(path);
+
+			if (f.fail())
+			{
+				throw invalidWriteOperation<string::value_type>(path);
+
+				return;
+			}
 			
 			write(f, variables, insertTrailingSpaces);
 			
@@ -521,9 +615,16 @@ namespace quickLib
 		{
 			wifstream f;
 
-			f.exceptions(wifstream::failbit | wifstream::badbit);
+			//f.exceptions(wifstream::failbit | wifstream::badbit);
 
 			f.open(path);
+
+			if (f.fail())
+			{
+				throw fileNotFound<wstring::value_type>(path);
+
+				return;
+			}
 			
 			read<wstring::value_type, wstring::traits_type>(f, variables);
 
@@ -536,9 +637,16 @@ namespace quickLib
 		{
 			wofstream f;
 			
-			f.exceptions(wofstream::failbit | wofstream::badbit);
+			//f.exceptions(wofstream::failbit | wofstream::badbit);
 
 			f.open(path);
+
+			if (f.fail())
+			{
+				throw invalidWriteOperation<wstring::value_type>(path);
+
+				return;
+			}
 			
 			write<wstring::value_type, wstring::traits_type>(f, variables, insertTrailingSpaces);
 			
