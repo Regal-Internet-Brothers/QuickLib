@@ -8,7 +8,7 @@
 */
 
 // Includes:
-#include <exception>
+#include <stdexcept>
 #include <algorithm>
 #include <functional>
 
@@ -62,11 +62,11 @@ namespace quickLib
 		// Classes:
 		
 		// Exceptions:
-		class INI_EXCEPTION : public exception
+		class INI_EXCEPTION : public runtime_error
 		{
 			public:
 				// Constructor(s):
-				INI_EXCEPTION() : exception() { /* Nothing so far. */ }
+				INI_EXCEPTION(const string& exception_name="QuickINI: Exception.") : runtime_error(exception_name) { /* Nothing so far. */ }
 
 				// Methods:
 				virtual const string message() const throw()
@@ -87,7 +87,7 @@ namespace quickLib
 				const strType file_path;
 
 				// Constructor(s):
-				fileException(const strType path) : INI_EXCEPTION(), file_path(path) { /* Nothing so far. */ }
+				fileException(const strType path, const string& exception_name="QuickINI: File exception.") : INI_EXCEPTION(exception_name), file_path(path) { /* Nothing so far. */ }
 
 				// Methods:
 				virtual const strType native_message() const throw()
@@ -107,11 +107,6 @@ namespace quickLib
 				{
 					return abstractStringToDefault(native_message());
 				}
-
-				virtual const char* what() const throw() override
-				{
-					return "QuickINI: File exception.";
-				}
 		};
 
 		template<typename characterType=char, typename characterTraits=char_traits<characterType>, typename strAlloc=allocator<characterType>>
@@ -119,10 +114,10 @@ namespace quickLib
 		{
 			public:
 				// Constructor(s):
-				fileNotFound(const strType path) : fileException(path) { /* Nothing so far. */ }
+				fileNotFound(const strType path, const string& exception_name="QuickINI: File not found.") : fileException(path, exception_name) { /* Nothing so far. */ }
 
 				// Methods:
-				virtual const strType native_message() const throw()
+				virtual const strType native_message() const throw() override
 				{
 					strStream ss;
 
@@ -141,10 +136,10 @@ namespace quickLib
 		{
 			public:
 				// Constructor(s):
-				invalidWriteOperation(const strType path) : fileException(path) { /* Nothing so far. */ }
+				invalidWriteOperation(const strType path, const string& exception_name="QuickINI: Invalid write operation.") : fileException(path, exception_name) { /* Nothing so far. */ }
 
 				// Methods:
-				virtual const strType native_message() const throw()
+				virtual const strType native_message() const throw() override
 				{
 					strStream ss;
 
@@ -162,18 +157,12 @@ namespace quickLib
 		{
 			public:
 				// Constructor(s):
-				operationUnsupported() : INI_EXCEPTION() { /* Nothing so far. */ }
+				operationUnsupported(const string& exception_name="QuickINI: Operation unsupported.") : INI_EXCEPTION(exception_name) { /* Nothing so far. */ }
 
 				// Methods:
 				virtual const string message() const throw()
 				{
 					return (string)"Operation unsupported.";
-				}
-
-				// This currently acts as a standard-compliant wrapper for the 'message' command.
-				virtual const char* what() const throw() override
-				{
-					return "QuickINI: Operation unsupported.";
 				}
 		};
 
@@ -181,10 +170,10 @@ namespace quickLib
 		{
 			public:
 				// Fields:
-				lineNumber_t error_line;
+				const lineNumber_t error_line;
 
 				// Constructor(s):
-				lineError(lineNumber_t lineNumber) : error_line(lineNumber) { /* Nothing so far. */ }
+				lineError(const lineNumber_t lineNumber, const string& exception_name="QuickINI: Generic line error.") : INI_EXCEPTION(exception_name), error_line(lineNumber) { /* Nothing so far. */ }
 
 				// Methods:
 				virtual const string message() const throw() override
@@ -201,7 +190,7 @@ namespace quickLib
 		{
 			public:
 				// Constructor(s):
-				invalidSegment(lineNumber_t lineNumber) : lineError(lineNumber) { /* Nothing so far. */ }
+				invalidSegment(const lineNumber_t lineNumber, const string& exception_name="QuickINI: Invalid segment.") : lineError(lineNumber, exception_name) { /* Nothing so far. */ }
 
 				// Methods:
 				virtual const string message() const throw() override
@@ -221,8 +210,8 @@ namespace quickLib
 		{
 			public:
 				// Constructor(s):
-				variableParseError(lineNumber_t lineNumber, string info="")
-					: lineError(lineNumber), information(info) { /* Nothing so far. */ }
+				variableParseError(const lineNumber_t lineNumber, const string info="", const string& exception_name="QuickINI: Variable parse error.")
+					: lineError(lineNumber, exception_name), information(info) { /* Nothing so far. */ }
 
 				// Methods:
 				virtual const string message() const throw() override
@@ -240,19 +229,19 @@ namespace quickLib
 				}
 
 				// Fields:
-				string information;
+				const string information;
 		};
 
 		class invalidRightOperand : public variableParseError
 		{
 			public:
 				// Fields:
-				string leftOperand;
-				string rightOperand;
+				const string leftOperand;
+				const string rightOperand;
 
 				// Constructor(s):
-				invalidRightOperand(lineNumber_t lineNumber, string left, string right=string())
-					: variableParseError(lineNumber), leftOperand(left), rightOperand(right) { /* Nothing so far. */ }
+				invalidRightOperand(const lineNumber_t lineNumber, const string left, const string right=string(), const string& exception_name="QuickINI: Invalid right-operand.")
+					: variableParseError(lineNumber, exception_name), leftOperand(left), rightOperand(right) { /* Nothing so far. */ }
 
 				// Methods:
 				virtual const string message() const throw() override

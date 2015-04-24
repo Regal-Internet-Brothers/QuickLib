@@ -8,7 +8,6 @@
 	#include <QuickLib/QuickINI/QuickINI.h>
 #endif
 
-/*
 int main()
 {
 	// Namespace(s):
@@ -46,7 +45,7 @@ int main()
 		return -1;
 	}
 
-	cout << "------------------------" << endl;
+	cout << "------------------------" << endl << endl;
 
 	INI::write(wcout, data, true);
 
@@ -54,4 +53,3 @@ int main()
 
 	return 0;
 }
-*/

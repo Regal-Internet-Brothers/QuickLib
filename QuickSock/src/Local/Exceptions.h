@@ -1,7 +1,7 @@
 #pragma once
 
 // Includes:
-#include <exception>
+#include <stdexcept>
 #include <string>
 #include <sstream>
 
@@ -16,33 +16,24 @@ namespace quickLib
 		class QSocket;
 
 		// Exception classes (Boilerplate, placeholders, etc):
-		class QSOCK_EXCEPTION : public std::exception
+		class QSOCK_EXCEPTION : public std::runtime_error
 		{
 			public:
 				// Constructor(s):
-				QSOCK_EXCEPTION(const QSocket* target);
+				QSOCK_EXCEPTION(const QSocket* target, const std::string& exception_name="QuickSock: Exception.");
 
 				// Methods:
 				virtual const std::string message() const throw() = 0;
-
-				// This currently acts as a standard-compliant wrapper for the 'message' command.
-				virtual const char* what() const throw() override;
 
 				// Fields:
 				const QSocket* socket;
 		};
 
-		class QSOCK_CONSTRUCTION_EXCEPTION : public QSOCK_EXCEPTION
+		class QSOCK_CONSTRUCTION_EXCEPTION final : public QSOCK_EXCEPTION
 		{
 			public:
 				// Constructor(s):
 				QSOCK_CONSTRUCTION_EXCEPTION(const QSocket* target);
-
-				// Methods:
-				virtual const std::string message() const throw() override
-				{
-					return "Unable to construct 'QSocket' object.";
-				}
 		};
 
 		// This kind of error should be thrown when an invalid read or write was performed.
@@ -50,7 +41,7 @@ namespace quickLib
 		{
 			public:
 				// Constructor(s):
-				QSOCK_OUT_OF_BOUNDS_EXCEPTION(const QSocket* target, void* targetedBuffer, size_t bufferSize, size_t offsetInBuffer);
+				QSOCK_OUT_OF_BOUNDS_EXCEPTION(const QSocket* target, void* targetedBuffer, size_t bufferSize, size_t offsetInBuffer, const std::string& exception_name="QuickSock: Out of bounds exception.");
 
 				virtual const std::string message() const throw() override
 				{
@@ -91,8 +82,8 @@ namespace quickLib
 				};
 
 				// Constructor(s):
-				QSOCK_SEEK_EXCEPTION(const QSocket* target, size_t bufferSize, size_t offsetInBuffer, seekMode mode, void* targetedBuffer=nullptr);
-				QSOCK_SEEK_EXCEPTION(const QSocket* target, seekMode mode, size_t position=0);
+				QSOCK_SEEK_EXCEPTION(const QSocket* target, size_t bufferSize, size_t offsetInBuffer, seekMode mode, void* targetedBuffer=nullptr, const std::string& exception_name="QuickSock: Seek exception.");
+				QSOCK_SEEK_EXCEPTION(const QSocket* target, seekMode mode, size_t position=0, const std::string& exception_name="QuickSock: Seek exception.");
 
 				// Methods:
 				virtual const std::string makeInfoStr() const
@@ -114,7 +105,7 @@ namespace quickLib
 		{
 			public:
 				// Constructor(s):
-				QSOCK_READ_EXCEPTION(const QSocket* target, void* targetedBuffer, size_t bufferSize, size_t offsetInBuffer);
+				QSOCK_READ_EXCEPTION(const QSocket* target, void* targetedBuffer, size_t bufferSize, size_t offsetInBuffer, const std::string& exception_name="QuickSock: Read exception.");
 
 				// Methods:
 				virtual const std::string message() const throw() override
@@ -136,7 +127,7 @@ namespace quickLib
 		{
 			public:
 				// Constructor(s):
-				QSOCK_WRITE_EXCEPTION(const QSocket* target, void* targetedBuffer, size_t bufferSize, size_t offsetInBuffer);
+				QSOCK_WRITE_EXCEPTION(const QSocket* target, void* targetedBuffer, size_t bufferSize, size_t offsetInBuffer, const std::string& exception_name="QuickSock: Write exception.");
 
 				// Methods:
 				virtual const std::string message() const throw() override

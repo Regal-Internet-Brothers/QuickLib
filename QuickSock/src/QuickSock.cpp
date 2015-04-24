@@ -92,32 +92,27 @@ namespace quickLib
 		// QSOCK_EXCEPTION:
 
 		// Constructor(s):
-		QSOCK_EXCEPTION::QSOCK_EXCEPTION(const QSocket* target) : exception(), socket(target) { /* Nothing so far. */ }
-
-		// Methods:
-		const char* QSOCK_EXCEPTION::what() const throw()
-		{
-			return message().c_str();
-		}
+		QSOCK_EXCEPTION::QSOCK_EXCEPTION(const QSocket* target, const std::string& exception_name)
+			: std::runtime_error(exception_name), socket(target) { /* Nothing so far. */ }
 
 		// QSOCK_CONSTRUCTION_EXCEPTION:
 
 		// Constructor(s):
-		QSOCK_CONSTRUCTION_EXCEPTION::QSOCK_CONSTRUCTION_EXCEPTION(const QSocket* target) : QSOCK_EXCEPTION(target) { /* Nothing so far. */ }
+		QSOCK_CONSTRUCTION_EXCEPTION::QSOCK_CONSTRUCTION_EXCEPTION(const QSocket* target) : QSOCK_EXCEPTION(target, "QuickSock: Construction exception.") { /* Nothing so far. */ }
 
 		// QSOCK_OUT_OF_BOUNDS_EXCEPTION:
 
 		// Constructor(s):
-		QSOCK_OUT_OF_BOUNDS_EXCEPTION::QSOCK_OUT_OF_BOUNDS_EXCEPTION(const QSocket* target, void* targetedBuffer, size_type bufferSize, size_type offsetInBuffer)
-			: QSOCK_EXCEPTION(target), buffer(targetedBuffer), sizeofBuffer(bufferSize), relativePosition(offsetInBuffer) { /* Nothing so far. */ }
+		QSOCK_OUT_OF_BOUNDS_EXCEPTION::QSOCK_OUT_OF_BOUNDS_EXCEPTION(const QSocket* target, void* targetedBuffer, size_type bufferSize, size_type offsetInBuffer, const std::string& exception_name)
+			: QSOCK_EXCEPTION(target, exception_name), buffer(targetedBuffer), sizeofBuffer(bufferSize), relativePosition(offsetInBuffer) { /* Nothing so far. */ }
 
 		// QSOCK_SEEK_EXCEPTION:
 
 		// Constructor(s):
-		QSOCK_SEEK_EXCEPTION::QSOCK_SEEK_EXCEPTION(const QSocket* target, size_type bufferSize, size_type offsetInBuffer, seekMode mode, void* targetedBuffer)
-			: QSOCK_OUT_OF_BOUNDS_EXCEPTION(target, targetedBuffer, bufferSize, offsetInBuffer) { /* Nothing so far. */ }
+		QSOCK_SEEK_EXCEPTION::QSOCK_SEEK_EXCEPTION(const QSocket* target, size_type bufferSize, size_type offsetInBuffer, seekMode mode, void* targetedBuffer, const std::string& exception_name)
+			: QSOCK_OUT_OF_BOUNDS_EXCEPTION(target, targetedBuffer, bufferSize, offsetInBuffer, exception_name) { /* Nothing so far. */ }
 
-		QSOCK_SEEK_EXCEPTION::QSOCK_SEEK_EXCEPTION(const QSocket* target, seekMode mode, size_type position)
+		QSOCK_SEEK_EXCEPTION::QSOCK_SEEK_EXCEPTION(const QSocket* target, seekMode mode, size_type position, const std::string& exception_name)
 			: QSOCK_OUT_OF_BOUNDS_EXCEPTION
 			(
 				target,
@@ -125,20 +120,22 @@ namespace quickLib
 					(target->inbuffer) : (target->outbuffer),
 				(mode == SEEK_MODE_IN) ?
 					(target->inbufferlen) : (target->outbufferlen),
-				position
+				position,
+
+				exception_name
 			) { /* Nothing so far. */ }
 
 		// QSOCK_READ_EXCEPTION:
 
 		// Constructor(s):
-		QSOCK_READ_EXCEPTION::QSOCK_READ_EXCEPTION(const QSocket* target, void* targetedBuffer, size_type bufferSize, size_type offsetInBuffer)
-			: QSOCK_OUT_OF_BOUNDS_EXCEPTION(target, targetedBuffer, bufferSize, offsetInBuffer) { /* Nothing so far. */ }
+		QSOCK_READ_EXCEPTION::QSOCK_READ_EXCEPTION(const QSocket* target, void* targetedBuffer, size_type bufferSize, size_type offsetInBuffer, const std::string& exception_name)
+			: QSOCK_OUT_OF_BOUNDS_EXCEPTION(target, targetedBuffer, bufferSize, offsetInBuffer, exception_name) { /* Nothing so far. */ }
 
 		// QSOCK_WRITE_EXCEPTION:
 
 		// Constructor(s):
-		QSOCK_WRITE_EXCEPTION::QSOCK_WRITE_EXCEPTION(const QSocket* target, void* targetedBuffer, size_type bufferSize, size_type offsetInBuffer)
-			: QSOCK_OUT_OF_BOUNDS_EXCEPTION(target, targetedBuffer, bufferSize, offsetInBuffer) { /* Nothing so far. */ }
+		QSOCK_WRITE_EXCEPTION::QSOCK_WRITE_EXCEPTION(const QSocket* target, void* targetedBuffer, size_type bufferSize, size_type offsetInBuffer, const std::string& exception_name)
+			: QSOCK_OUT_OF_BOUNDS_EXCEPTION(target, targetedBuffer, bufferSize, offsetInBuffer, exception_name) { /* Nothing so far. */ }
 
 		// QSocket:
 
