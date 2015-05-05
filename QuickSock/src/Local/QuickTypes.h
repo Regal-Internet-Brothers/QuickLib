@@ -2,7 +2,10 @@
 // Data type definitions:
 #if !defined(QSOCK_DATATYPES)
 	#define QSOCK_DATATYPES
-
+	
+	// Includes:
+	#include <cstddef>
+	
 	// Character/8-bit types:
 	#define QSOCK_CHAR char
 	typedef QSOCK_CHAR qchar;
@@ -63,7 +66,7 @@
 		{
 			// Typedefs/aliases:
 			#if !defined(QSOCK_MONKEYMODE)
-				typedef size_t size_type;
+				typedef size_t size_type; // std::size_t
 			#else
 				typedef int size_type;
 			#endif

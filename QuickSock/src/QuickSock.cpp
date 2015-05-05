@@ -980,7 +980,11 @@ namespace quickLib
 			else
 			{
 				// Unfortunately, this has to be an 'int', instead of a 'size_type'.
-				int socketAddress_Length = (int)sizeof(socketAddress);
+				#ifdef QSOCK_WINDOWS
+					int socketAddress_Length = (int)sizeof(socketAddress);
+				#else
+					socklen_t socketAddress_Length = (socklen_t)sizeof(socketAddress);
+				#endif
 
 				response = (recvfrom(_socket, (QSOCK_CHAR*)inbuffer, (int)_bufferlen, 0, (sockaddr*)&si_Destination, &socketAddress_Length));
 
@@ -1024,7 +1028,7 @@ namespace quickLib
 		bool QSocket::clearInBuffer()
 		{
 			// 'Zero-out' the inbound-message buffer.
-			ZeroMemory(inbuffer, _bufferlen);
+			std::memset(inbuffer, 0, _bufferlen);
 
 			// Set the read-offset and inbound-message length to zero.
 			readOffset = 0;
@@ -1378,7 +1382,7 @@ namespace quickLib
 			return transferred;
 		}
 
-		bool QSocket::clearOutBuffer() { memset(outbuffer, 0, _bufferlen); flushOutput(); writeOffset = 0; return true; }
+		bool QSocket::clearOutBuffer() { std::memset(outbuffer, 0, _bufferlen); flushOutput(); writeOffset = 0; return true; }
 
 		// Buffer-writing related:
 

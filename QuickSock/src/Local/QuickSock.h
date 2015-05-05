@@ -76,11 +76,13 @@
 
 // C Standard library:
 #include <cstdlib>
-#include <algorithm>
+#include <cstring>
+//#include <cstddef>
 
 // C++ Standard Library:
 #include <string>
 #include <sstream>
+#include <algorithm>
 
 // Windows specific includes:
 #if defined(QSOCK_WINDOWS)
@@ -93,6 +95,8 @@
 	//#if (!defined(QSOCK_IPV6) && !defined(QSOCK_IPVABSTRACT))
 	#define _WINSOCK_DEPRECATED_NO_WARNINGS
 	//#endif
+
+	#define NOMINMAX
 	
 	// Make sure to link with the required library files:
 	#pragma comment (lib, "Ws2_32.lib")
@@ -115,13 +119,6 @@
 		#include <winsock.h>
 
 		typedef int socklen_t;
-	#endif
-
-	// WinSock's manifest constants for the 'shutdown' command:
-	#ifndef _WINSOCK2API_
-		#define SD_RECEIVE      0x00
-		#define SD_SEND         0x01
-		#define SD_BOTH         0x02
 	#endif
 
 	#ifdef QSOCK_WIN32_L_A_M
@@ -281,6 +278,13 @@
 	#define INVALID_SOCKET -1
 #endif
 
+// WinSock's manifest constants for the 'shutdown' command:
+#ifndef _WINSOCK2API_
+	#define SD_RECEIVE      0x00
+	#define SD_SEND         0x01
+	#define SD_BOTH         0x02
+#endif
+
 // Namespace(s):
 namespace quickLib
 {
@@ -403,7 +407,7 @@ namespace quickLib
 		template <typename T>
 		inline void ZeroVar(T& X)
 		{
-			memset(&X, 0, sizeof(X));
+			std::memset(&X, 0, sizeof(X));
 
 			return;
 		}
@@ -845,8 +849,8 @@ namespace quickLib
 				// length specified if it was out of bounds.
 				inline void setInputLength(size_type length)
 				{
-					inbufferlen = min(length, inbufferlen);
-					readOffset = min(readOffset, inbufferlen);
+					inbufferlen = std::min(length, inbufferlen);
+					readOffset = std::min(readOffset, inbufferlen);
 
 					return;
 				}
@@ -889,7 +893,7 @@ namespace quickLib
 					// Assign the new write-offset, then return it:
 					writeOffset = position;
 
-					outbufferlen = max(outbufferlen, writeOffset);
+					outbufferlen = std::max(outbufferlen, writeOffset);
 
 					return writeOffset;
 				}
@@ -1079,7 +1083,7 @@ namespace quickLib
 				// Use this with caution; use 'outSeek' if the intention is to normally "seek".
 				inline streamLocation setWrite(streamLocation position)
 				{
-					position = min(position, _bufferlen);
+					position = std::min(position, _bufferlen);
 
 					if (position > writeOffset)
 						flushOutputRegion(position-writeOffset);
@@ -1097,7 +1101,7 @@ namespace quickLib
 				inline streamLocation snapWriteLength()
 				{
 					// Assign the output-buffer's length, then return it:
-					writeOffset = min(writeOffset, outbufferlen);
+					writeOffset = std::min(writeOffset, outbufferlen);
 					outbufferlen = writeOffset;
 
 					return outbufferlen;
@@ -1140,8 +1144,8 @@ namespace quickLib
 				// length specified if it was out of bounds.
 				inline void setOutputLength(streamLocation length)
 				{
-					outbufferlen = min(length, _bufferlen);
-					writeOffset = min(writeOffset, outbufferlen);
+					outbufferlen = std::min(length, _bufferlen);
+					writeOffset = std::min(writeOffset, outbufferlen);
 
 					return;
 				}
