@@ -822,82 +822,12 @@ namespace quickLib
 				template <typename type>
 				inline type rawRead()
 				{
-					type data;
-			
-					readData(&data, sizeof(type));
-
-					return data;
+					return _rawRead<type>(this);
 				}
 
-				template <> inline QSOCK_UCHAR rawRead<QSOCK_UCHAR>()
-				{
-					#ifndef QSOCK_THROW_EXCEPTIONS
-						if (canRead(sizeof(QSOCK_UCHAR)))
-					#endif
-						{
-							// Hold the current read-offset.
-							auto currentOffset = readOffset;
-
-							// Attempt to seek forward.
-							inSeekForward(sizeof(QSOCK_UCHAR));
-
-							// Return the requested information.
-							return (QSOCK_UCHAR)inbuffer[currentOffset];
-						}
-
-					return 0;
-				}
-
-				template <> inline QSOCK_CHAR rawRead<QSOCK_CHAR>()
-				{
-					return (QSOCK_CHAR)rawRead<QSOCK_UCHAR>();
-				}
-
-				template <> inline bool rawRead<bool>()
-				{
-					return ((rawRead<QSOCK_UCHAR>() != 0) ? true : false);
-				}
-
-				// This acts as an automatic reading command for the type specified.
-				// When retrieving the data requested, the proper byte-order command will be used.
-				// If the speicfied type isn't directly supported, it will not be automatically byte-swapped.
 				template <typename type> inline type read()
 				{
-					return rawRead<type>();
-				}
-
-				template <> inline QSOCK_UINT16 read<QSOCK_UINT16>() { return (fixByteOrder) ? ntohs(rawRead<QSOCK_UINT16>()) : rawRead<QSOCK_UINT16>(); }
-				template <> inline QSOCK_INT16 read<QSOCK_INT16>() { return (QSOCK_INT16)read<QSOCK_UINT16>(); }
-
-				template <> inline QSOCK_UINT32_LONG read<QSOCK_UINT32_LONG>()
-				{
-					return ((fixByteOrder) ? ntohl(rawRead<QSOCK_UINT32_LONG>()) : rawRead<QSOCK_UINT32_LONG>());
-				}
-
-				template <> inline QSOCK_INT32_LONG read<QSOCK_INT32_LONG>() { return (QSOCK_INT32_LONG)read<QSOCK_UINT32_LONG>(); }
-
-				template <> inline QSOCK_UINT32 read<QSOCK_UINT32>() { return (QSOCK_UINT32)read<QSOCK_UINT32_LONG>(); }
-				template <> inline QSOCK_INT32 read<QSOCK_INT32>() { return (QSOCK_INT32)read<QSOCK_INT32_LONG>(); }
-
-				template <> inline QSOCK_UINT64 read<QSOCK_UINT64>() { return (fixByteOrder) ? ntohll(rawRead<QSOCK_UINT64>()) : rawRead<QSOCK_UINT64>(); }
-
-				template <> inline QSOCK_INT64 read<QSOCK_INT64>() { return (QSOCK_INT64)read<QSOCK_UINT64>(); }
-
-				template <> inline QSOCK_FLOAT32 read<QSOCK_FLOAT32>() { return (fixByteOrder) ? ntohf(rawRead<QSOCK_UINT32>()) : rawRead<QSOCK_FLOAT32>(); }
-				template <> inline QSOCK_FLOAT64 read<QSOCK_FLOAT64>() { return (fixByteOrder) ? ntohd(rawRead<QSOCK_UINT64>()) : rawRead<QSOCK_FLOAT64>(); }
-
-				template <> inline nativeString read<nativeString>()
-				{
-					// Read the string's length, then the string itself.
-					return readNativeString(readLengthOfString());
-				}
-
-				template <> inline std::wstring read<std::wstring>()
-				{
-					auto length = readLengthOfString();
-					auto str = std::wstring((const wchar_t*)simulatedReadBytes(length*sizeof(std::wstring::value_type)), length);
-
-					return str;
+					return _read<type>(this);
 				}
 
 				// Type-specific macros:
@@ -1141,64 +1071,28 @@ namespace quickLib
 				template <typename type>
 				inline bool rawWrite(type data)
 				{
-					return writeData(&data, sizeof(type));
-				}
-
-				template <> inline bool rawWrite<QSOCK_UCHAR>(QSOCK_UCHAR data)
-				{
-					#ifndef QSOCK_THROW_EXCEPTIONS
-						if (canWrite(sizeof(data)))
-					#endif
-						{
-							// Hold the current output-offset.
-							auto currentOffset = writeOffset;
-
-							// Attempt to seek forward.
-							outSeekForward(sizeof(data));
-
-							// Copy the specified data.
-							outbuffer[currentOffset] = (uqchar)data;
-
-							// Tell the user writing was successful.
-							return true;
-						}
-
-					return false;
-				}
-
-				template <> inline bool rawWrite<QSOCK_CHAR>(QSOCK_CHAR data)
-				{
-					return rawWrite<QSOCK_UCHAR>((QSOCK_UCHAR)data);
-				}
-
-				template <> inline bool rawWrite<bool>(bool data)
-				{
-					return rawWrite<QSOCK_UCHAR>((data) ? 1 : 0);
+					return _rawWrite<type>(this, data);
 				}
 
 				template <typename type> inline bool write(type data)
 				{
-					return rawWrite<type>(data);
+					return _write<type>(this, data);
 				}
 
-				template <> inline bool write<QSOCK_UINT16>(QSOCK_UINT16 data) { return (fixByteOrder) ? rawWrite<QSOCK_UINT16>(htons(data)) : rawWrite<QSOCK_UINT16>(data); }
-				template <> inline bool write<QSOCK_INT16>(QSOCK_INT16 data) { return write<QSOCK_UINT16>((QSOCK_UINT16)data); }
-
-				template <> inline bool write<QSOCK_UINT32_LONG>(QSOCK_UINT32_LONG data)
+				inline bool write(nativeString str, size_type length)
 				{
-					return ((fixByteOrder) ? rawWrite<QSOCK_UINT32_LONG>(htonl(data)) : rawWrite<QSOCK_UINT32_LONG>(data));
+					// Write the string and its length:
+					writeLengthOfString(length);
+
+					return writeNativeString(str.c_str(), (uqint)length);
 				}
 
-				template <> inline bool write<QSOCK_INT32_LONG>(QSOCK_INT32_LONG data) { return write<QSOCK_UINT32_LONG>((QSOCK_UINT32_LONG)data); }
+				inline bool write(std::wstring wstr, size_type length)
+				{
+					writeLengthOfString(length);
 
-				template <> inline bool write<QSOCK_UINT32>(QSOCK_UINT32 data) { return write<QSOCK_UINT32_LONG>((QSOCK_UINT32_LONG)data); }
-				template <> inline bool write<QSOCK_INT32>(QSOCK_INT32 data) { return write<QSOCK_INT32_LONG>((QSOCK_INT32_LONG)data); }
-
-				template <> inline bool write<QSOCK_UINT64>(QSOCK_UINT64 data) { return rawWrite<QSOCK_UINT64>((fixByteOrder) ? htonll(data) : data); }
-				template <> inline bool write<QSOCK_INT64>(QSOCK_INT64 data) { return write<QSOCK_UINT64>((QSOCK_UINT64)data); }
-
-				template <> inline bool write<QSOCK_FLOAT32>(QSOCK_FLOAT32 data) { return (fixByteOrder) ? write<QSOCK_UINT32>(htonf(data)) : rawWrite<QSOCK_FLOAT32>(data); }
-				template <> inline bool write<QSOCK_FLOAT64>(QSOCK_FLOAT64 data) { return (fixByteOrder) ? write<QSOCK_UINT64>(htond(data)) : rawWrite<QSOCK_FLOAT64>(data); }
+					return writeData(wstr.c_str(), length*sizeof(std::wstring::value_type));
+				}
 
 				inline bool writeLengthOfString(size_type length)
 				{
@@ -1213,31 +1107,6 @@ namespace quickLib
 				inline bool writeLengthOfString(std::wstring wstr)
 				{
 					return writeLengthOfString(lengthOfString(wstr));
-				}
-
-				inline bool write(nativeString str, size_type length)
-				{
-					// Write the string and its length:
-					writeLengthOfString(length);
-
-					return writeNativeString(str.c_str(), (uqint)length);
-				}
-
-				template <> inline bool write<nativeString>(nativeString str)
-				{
-					return write(str, lengthOfString(str));
-				}
-
-				inline bool write(std::wstring wstr, size_type length)
-				{
-					writeLengthOfString(length);
-
-					return writeData(wstr.c_str(), length*sizeof(std::wstring::value_type));
-				}
-
-				template <> inline bool write<std::wstring>(std::wstring wstr)
-				{
-					return write(wstr, lengthOfString(wstr));
 				}
 
 				inline bool writeIP(QSOCK_UINT32_LONG address)
@@ -1391,6 +1260,172 @@ namespace quickLib
 					return *this;
 				}
 			private:
+				// Functions (Private):
+
+				// I/O related:
+
+				// Input:
+
+				// This command will read the type specified, but it will not
+				// automatically swap the appropriate bytes of the type.
+				// To do this, please use the 'read' command.
+				template <typename type>
+				static inline type _rawRead(QSocket* socket)
+				{
+					type data;
+			
+					socket->readData(&data, sizeof(type));
+
+					return data;
+				}
+
+				template <> static inline QSOCK_UCHAR _rawRead<QSOCK_UCHAR>(QSocket* socket)
+				{
+					#ifndef QSOCK_THROW_EXCEPTIONS
+						if (socket->canRead(sizeof(QSOCK_UCHAR)))
+					#endif
+						{
+							// Hold the current read-offset.
+							auto currentOffset = socket->readOffset;
+
+							// Attempt to seek forward.
+							socket->inSeekForward(sizeof(QSOCK_UCHAR));
+
+							// Return the requested information.
+							return (QSOCK_UCHAR)socket->inbuffer[currentOffset];
+						}
+
+					return 0;
+				}
+
+				template <> static inline QSOCK_CHAR _rawRead<QSOCK_CHAR>(QSocket* socket)
+				{
+					return (QSOCK_CHAR)_rawRead<QSOCK_UCHAR>(socket);
+				}
+
+				template <> static inline bool _rawRead<bool>(QSocket* socket)
+				{
+					return ((_rawRead<QSOCK_UCHAR>(socket) != 0) ? true : false);
+				}
+
+				// This acts as an automatic reading command for the type specified.
+				// When retrieving the data requested, the proper byte-order command will be used.
+				// If the speicfied type isn't directly supported, it will not be automatically byte-swapped.
+				template <typename type> static inline type _read(QSocket* socket)
+				{
+					return socket->_rawRead<type>(socket);
+				}
+
+				template <> static inline QSOCK_UINT16 _read<QSOCK_UINT16>(QSocket* socket) { return (socket->fixByteOrder) ? ntohs(socket->rawRead<QSOCK_UINT16>()) : socket->rawRead<QSOCK_UINT16>(); }
+				template <> static inline QSOCK_INT16 _read<QSOCK_INT16>(QSocket* socket) { return (QSOCK_INT16)_read<QSOCK_UINT16>(socket); }
+
+				template <> static inline QSOCK_UINT32_LONG _read<QSOCK_UINT32_LONG>(QSocket* socket)
+				{
+					return ((socket->fixByteOrder) ? ntohl(socket->rawRead<QSOCK_UINT32_LONG>()) : socket->rawRead<QSOCK_UINT32_LONG>());
+				}
+
+				template <> static inline QSOCK_INT32_LONG _read<QSOCK_INT32_LONG>(QSocket* socket) { return (QSOCK_INT32_LONG)_read<QSOCK_UINT32_LONG>(socket); }
+
+				template <> static inline QSOCK_UINT32 _read<QSOCK_UINT32>(QSocket* socket) { return (QSOCK_UINT32)_read<QSOCK_UINT32_LONG>(socket); }
+				template <> static inline QSOCK_INT32 _read<QSOCK_INT32>(QSocket* socket) { return (QSOCK_INT32)_read<QSOCK_INT32_LONG>(socket); }
+
+				template <> static inline QSOCK_UINT64 _read<QSOCK_UINT64>(QSocket* socket) { return (socket->fixByteOrder) ? ntohll(socket->rawRead<QSOCK_UINT64>()) : socket->rawRead<QSOCK_UINT64>(); }
+
+				template <> static inline QSOCK_INT64 _read<QSOCK_INT64>(QSocket* socket) { return (QSOCK_INT64)_read<QSOCK_UINT64>(socket); }
+
+				template <> static inline QSOCK_FLOAT32 _read<QSOCK_FLOAT32>(QSocket* socket) { return (socket->fixByteOrder) ? ntohf(socket->rawRead<QSOCK_UINT32>()) : socket->rawRead<QSOCK_FLOAT32>(); }
+				template <> static inline QSOCK_FLOAT64 _read<QSOCK_FLOAT64>(QSocket* socket) { return (socket->fixByteOrder) ? ntohd(socket->rawRead<QSOCK_UINT64>()) : socket->rawRead<QSOCK_FLOAT64>(); }
+
+				template <> static inline nativeString _read<nativeString>(QSocket* socket)
+				{
+					// Read the string's length, then the string itself.
+					return socket->readNativeString(socket->readLengthOfString());
+				}
+
+				template <> static inline std::wstring _read<std::wstring>(QSocket* socket)
+				{
+					auto length = socket->readLengthOfString();
+
+					return std::wstring((const wchar_t*)socket->simulatedReadBytes(length*sizeof(std::wstring::value_type)), length);
+				}
+
+				// Output:
+
+				// This command will write the type specified, but it will not
+				// automatically swap the appropriate bytes of the type.
+				// To do this, please use the 'write' command.
+				template <typename type>
+				inline static bool _rawWrite(QSocket* socket, type data)
+				{
+					return socket->writeData(&data, sizeof(type));
+				}
+
+				template <> inline static bool _rawWrite<QSOCK_UCHAR>(QSocket* socket, QSOCK_UCHAR data)
+				{
+					#ifndef QSOCK_THROW_EXCEPTIONS
+						if (socket->canWrite(sizeof(data)))
+					#endif
+						{
+							// Hold the current output-offset.
+							auto currentOffset = socket->writeOffset;
+
+							// Attempt to seek forward.
+							socket->outSeekForward(sizeof(data));
+
+							// Copy the specified data.
+							socket->outbuffer[currentOffset] = (uqchar)data;
+
+							// Tell the user writing was successful.
+							return true;
+						}
+
+					return false;
+				}
+
+				template <> inline static bool _rawWrite<QSOCK_CHAR>(QSocket* socket, QSOCK_CHAR data)
+				{
+					return _rawWrite<QSOCK_UCHAR>(socket, (QSOCK_UCHAR)data);
+				}
+
+				template <> inline static bool _rawWrite<bool>(QSocket* socket, bool data)
+				{
+					return _rawWrite<QSOCK_UCHAR>(socket, (data) ? 1 : 0);
+				}
+
+				template <typename type> inline static bool _write(QSocket* socket, type data)
+				{
+					return _rawWrite<type>(socket, data);
+				}
+
+				template <> inline static bool _write<QSOCK_UINT16>(QSocket* socket, QSOCK_UINT16 data) { return (socket->fixByteOrder) ? socket->rawWrite<QSOCK_UINT16>(htons(data)) : socket->rawWrite<QSOCK_UINT16>(data); }
+				template <> inline static bool _write<QSOCK_INT16>(QSocket* socket, QSOCK_INT16 data) { return _write<QSOCK_UINT16>(socket, (QSOCK_UINT16)data); }
+
+				template <> inline static bool _write<QSOCK_UINT32_LONG>(QSocket* socket, QSOCK_UINT32_LONG data)
+				{
+					return ((socket->fixByteOrder) ? socket->rawWrite<QSOCK_UINT32_LONG>(htonl(data)) : socket->rawWrite<QSOCK_UINT32_LONG>(data));
+				}
+
+				template <> inline static bool _write<QSOCK_INT32_LONG>(QSocket* socket, QSOCK_INT32_LONG data) { return _write<QSOCK_UINT32_LONG>(socket, (QSOCK_UINT32_LONG)data); }
+
+				template <> inline static bool _write<QSOCK_UINT32>(QSocket* socket, QSOCK_UINT32 data) { return _write<QSOCK_UINT32_LONG>(socket, (QSOCK_UINT32_LONG)data); }
+				template <> inline static bool _write<QSOCK_INT32>(QSocket* socket, QSOCK_INT32 data) { return _write<QSOCK_INT32_LONG>(socket, (QSOCK_INT32_LONG)data); }
+
+				template <> inline static bool _write<QSOCK_UINT64>(QSocket* socket, QSOCK_UINT64 data) { return socket->rawWrite<QSOCK_UINT64>((socket->fixByteOrder) ? htonll(data) : data); }
+				template <> inline static bool _write<QSOCK_INT64>(QSocket* socket, QSOCK_INT64 data) { return _write<QSOCK_UINT64>(socket, (QSOCK_UINT64)data); }
+
+				template <> inline static bool _write<QSOCK_FLOAT32>(QSocket* socket, QSOCK_FLOAT32 data) { return (socket->fixByteOrder) ? _write<QSOCK_UINT32>(socket, htonf(data)) : _rawWrite<QSOCK_FLOAT32>(socket, data); }
+				template <> inline static bool _write<QSOCK_FLOAT64>(QSocket* socket, QSOCK_FLOAT64 data) { return (socket->fixByteOrder) ? _write<QSOCK_UINT64>(socket, htond(data)) : _rawWrite<QSOCK_FLOAT64>(socket, data); }
+
+				template <> inline static bool _write<nativeString>(QSocket* socket, nativeString str)
+				{
+					return socket->write(str, lengthOfString(str));
+				}
+
+				template <> static inline bool _write<std::wstring>(QSocket* socket, std::wstring wstr)
+				{
+					return socket->write(wstr, lengthOfString(wstr));
+				}
+
 				// Methods (Private):
 				bool setupDestinationV4(QSOCK_UINT32_LONG address, nativePort externalPort);
 				bool setupDestination(std::string address, nativePort externalPort);
