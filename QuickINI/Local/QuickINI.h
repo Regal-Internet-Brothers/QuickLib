@@ -7,6 +7,12 @@
 		For example, wide-streams likely won't support 'std::string' as an input.
 */
 
+// Preprocessor related:
+#if defined(_MSC_VER) && !defined(__INTEL_COMPILER)
+	#define QINI_ADVANCED_STRING_CODECS
+	#define QINI_WIDE_PATHS
+#endif
+
 // Includes:
 #include <stdexcept>
 #include <algorithm>
@@ -15,8 +21,11 @@
 #include <string>
 
 #include <cctype>
-#include <codecvt>
-//#include <locale>
+
+#ifdef QINI_ADVANCED_STRING_CODECS
+	#include <codecvt>
+	//#include <locale>
+#endif
 
 #include <iostream>
 #include <fstream>
@@ -59,6 +68,116 @@ namespace quickLib
 			sectionEndSymbol = ']',
 		};
 
+		// Functions (String manipulation):
+
+		// Functions:
+		inline string wideStringToDefault(const wstring& wstr)
+		{
+			#ifdef QINI_ADVANCED_STRING_CODECS
+				std::wstring_convert<std::codecvt_utf8<wchar_t>> stringConverter;
+
+				return stringConverter.to_bytes(wstr);
+			#else
+				//throw operationUnsupported();
+
+				return string(wstr.begin(), wstr.end());
+			#endif
+		}
+		
+		inline wstring defaultStringToWide(const string& str)
+		{
+			#ifdef QINI_ADVANCED_STRING_CODECS
+				std::wstring_convert<std::codecvt_utf8<wchar_t>> stringConverter;
+
+				return stringConverter.from_bytes(str);
+			#else
+				//throw operationUnsupported();
+				//return wstring();
+				
+				return wstring(str.begin(), str.end());
+			#endif
+		}
+
+		inline void correctString(const string& str, wstring& output)
+		{
+			output = defaultStringToWide(str);
+
+			return;
+		}
+
+		inline void correctString(const wstring& wstr, string& output)
+		{
+			output = wideStringToDefault(wstr);
+
+			return;
+		}
+
+		inline void correctString(const string& str, string& output)
+		{
+			output = str;
+
+			return;
+		}
+
+		inline void correctString(const wstring& wstr, wstring& output)
+		{
+			output = wstr;
+
+			return;
+		}
+
+		inline string abstractStringToDefault(const string& str)
+		{
+			return str;
+		}
+
+		inline string abstractStringToDefault(const wstring& wstr)
+		{
+			return wideStringToDefault(wstr);
+		}
+
+		inline wstring abstractStringToWide(const wstring& wstr)
+		{
+			return wstr;
+		}
+
+		inline wstring abstractStringToWide(const string& str)
+		{
+			return defaultStringToWide(str);
+		}
+
+		static inline int isquote(int c)
+		{
+			return (int)(c == '\"');
+		}
+
+		// String "cleanup" / trimming code by Evan Teran:
+		template <typename str=string>
+		inline str ltrim(str s)
+		{
+			s.erase(s.begin(), find_if(s.begin(), s.end(), not1(ptr_fun<int, int>(isspace))));
+			s.erase(s.begin(), find_if(s.begin(), s.end(), not1(ptr_fun<int, int>(isquote))));
+			//s.erase(s.begin(), find_if(s.begin(), s.end(), not1(ptr_fun<int, int>(ispunct))));
+
+			return s;
+		}
+
+		template <typename str=string>
+		inline str rtrim(str s)
+		{
+			s.erase(find_if(s.rbegin(), s.rend(), not1(ptr_fun<int, int>(isspace))).base(), s.end());
+			s.erase(find_if(s.rbegin(), s.rend(), not1(ptr_fun<int, int>(isquote))).base(), s.end());
+			//s.erase(find_if(s.rbegin(), s.rend(), not1(ptr_fun<int, int>(ispunct))).base(), s.end());
+
+			return s;
+		}
+
+		template <typename str=string>
+		inline str trim(str s)
+		{
+			return rtrim(ltrim(s));
+		}
+
 		// Classes:
 		
 		// Exceptions:
@@ -87,7 +206,8 @@ namespace quickLib
 				const strType file_path;
 
 				// Constructor(s):
-				fileException(const strType path, const string& exception_name="QuickINI: File exception.") : INI_EXCEPTION(exception_name), file_path(path) { /* Nothing so far. */ }
+				fileException(const strType path, const string& exception_name="QuickINI: File exception.")
+					: INI_EXCEPTION(exception_name), file_path(path) { /* Nothing so far. */ }
 
 				// Methods:
 				virtual const strType native_message() const throw()
@@ -113,8 +233,14 @@ namespace quickLib
 		class fileNotFound : public fileException<characterType, characterTraits, strAlloc>
 		{
 			public:
+				// Typedefs:
+				typedef fileException<characterType, characterTraits, strAlloc> super;
+				typedef basic_string<characterType, characterTraits, strAlloc> strType;
+				typedef basic_stringstream<characterType, characterTraits, strAlloc> strStream;
+
 				// Constructor(s):
-				fileNotFound(const strType path, const string& exception_name="QuickINI: File not found.") : fileException(path, exception_name) { /* Nothing so far. */ }
+				fileNotFound(const strType path, const string& exception_name="QuickINI: File not found.")
+					: fileException<characterType, characterTraits, strAlloc>(path, exception_name) { /* Nothing so far. */ } // super
 
 				// Methods:
 				virtual const strType native_message() const throw() override
@@ -125,7 +251,7 @@ namespace quickLib
 
 					correctString("File not found: ", str);
 
-					ss << str << file_path;
+					ss << str << super::file_path;
 
 					return ss.str();
 				}
@@ -135,8 +261,14 @@ namespace quickLib
 		class invalidWriteOperation : public fileException<characterType, characterTraits, strAlloc>
 		{
 			public:
+				// Typedefs:
+				typedef fileException<characterType, characterTraits, strAlloc> super;
+				typedef basic_string<characterType, characterTraits, strAlloc> strType;
+				typedef basic_stringstream<characterType, characterTraits, strAlloc> strStream;
+
 				// Constructor(s):
-				invalidWriteOperation(const strType path, const string& exception_name="QuickINI: Invalid write operation.") : fileException(path, exception_name) { /* Nothing so far. */ }
+				invalidWriteOperation(const strType path, const string& exception_name="QuickINI: Invalid write operation.")
+					: fileException<characterType, characterTraits, strAlloc>(path, exception_name) { /* Nothing so far. */ }
 
 				// Methods:
 				virtual const strType native_message() const throw() override
@@ -147,7 +279,7 @@ namespace quickLib
 
 					correctString("Invalid write operation: ", str);
 
-					ss << str << file_path;
+					ss << str << super::file_path;
 
 					return ss.str();
 				}
@@ -276,104 +408,7 @@ namespace quickLib
 				}
 		};
 
-		// Functions:
-
-		// String management:
-
-		// Functions:
-		inline string wideStringToDefault(const wstring wstr)
-		{
-			std::wstring_convert<std::codecvt_utf8<wchar_t>> stringConverter;
-
-			return stringConverter.to_bytes(wstr);
-		}
-		
-		inline wstring defaultStringToWide(const string str)
-		{
-			std::wstring_convert<std::codecvt_utf8<wchar_t>> stringConverter;
-
-			return stringConverter.from_bytes(str);
-		}
-
-		inline void correctString(const string str, wstring& output)
-		{
-			output = defaultStringToWide(str);
-
-			return;
-		}
-
-		inline void correctString(const wstring wstr, string& output)
-		{
-			output = wideStringToDefault(wstr);
-
-			return;
-		}
-
-		inline void correctString(const string str, string& output)
-		{
-			output = str;
-
-			return;
-		}
-
-		inline void correctString(const wstring wstr, wstring& output)
-		{
-			output = wstr;
-
-			return;
-		}
-
-		inline string abstractStringToDefault(const string str)
-		{
-			return str;
-		}
-
-		inline string abstractStringToDefault(const wstring wstr)
-		{
-			return wideStringToDefault(wstr);
-		}
-
-		inline wstring abstractStringToWide(const wstring wstr)
-		{
-			return wstr;
-		}
-
-		inline wstring abstractStringToWide(const string str)
-		{
-			return defaultStringToWide(str);
-		}
-
-		static inline int isquote(int c)
-		{
-			return (int)(c == '\"');
-		}
-
-		// String "cleanup" / trimming code by Evan Teran:
-		template <typename str=string>
-		inline str ltrim(str s)
-		{
-			s.erase(s.begin(), find_if(s.begin(), s.end(), not1(ptr_fun<int, int>(isspace))));
-			s.erase(s.begin(), find_if(s.begin(), s.end(), not1(ptr_fun<int, int>(isquote))));
-			//s.erase(s.begin(), find_if(s.begin(), s.end(), not1(ptr_fun<int, int>(ispunct))));
-
-			return s;
-		}
-
-		template <typename str=string>
-		inline str rtrim(str s)
-		{
-			s.erase(find_if(s.rbegin(), s.rend(), not1(ptr_fun<int, int>(isspace))).base(), s.end());
-			s.erase(find_if(s.rbegin(), s.rend(), not1(ptr_fun<int, int>(isquote))).base(), s.end());
-			//s.erase(find_if(s.rbegin(), s.rend(), not1(ptr_fun<int, int>(ispunct))).base(), s.end());
-
-			return s;
-		}
-
-		template <typename str=string>
-		inline str trim(str s)
-		{
-			return rtrim(ltrim(s));
-		}
+		// Functions (INI):
 
 		// This command reads an INI entry from the specified input-stream.
 		// The return value is the new line-number, based on the input given.
@@ -606,7 +641,11 @@ namespace quickLib
 
 			//f.exceptions(wifstream::failbit | wifstream::badbit);
 
-			f.open(path);
+			#ifdef QINI_WIDE_PATHS
+				f.open(path);
+			#else
+				f.open(wideStringToDefault(path));
+			#endif
 
 			if (f.fail())
 			{
@@ -628,7 +667,11 @@ namespace quickLib
 			
 			//f.exceptions(wofstream::failbit | wofstream::badbit);
 
-			f.open(path);
+			#ifdef QINI_WIDE_PATHS
+				f.open(path);
+			#else
+				f.open(wideStringToDefault(path));
+			#endif
 
 			if (f.fail())
 			{

@@ -93,7 +93,7 @@
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
-    <OutDir>$(SolutionDir)\QuickLib\$(PlatformTarget)\$(ProjectName)\$(Configuration)\</OutDir>
+    <OutDir>$(SolutionDir)\QuickLib (Demos)\$(PlatformTarget)\$(ProjectName)\$(Configuration)\</OutDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|ARM'">
     <IntDir>$(Configuration)\</IntDir>
@@ -104,7 +104,7 @@
     <IntDir>$(Configuration)\</IntDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
-    <OutDir>$(SolutionDir)\QuickLib\$(PlatformTarget)\$(ProjectName)\$(Configuration)\</OutDir>
+    <OutDir>$(SolutionDir)\QuickLib (Demos)\$(PlatformTarget)\$(ProjectName)\$(Configuration)\</OutDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|ARM'">
     <IntDir>$(Configuration)\</IntDir>
