@@ -35,8 +35,8 @@
 	// used very often by the IPV4 implementation to begin with.
 	#define QSOCK_IPV4_RESOLVE_HOSTNAMES
 	
-	//#define QSOCK_IPVABSTRACT // By defining this, 'QuickSock' will use a 'modern' abstract approach to IP-version handling (May cause problems).
-	//#define QSOCK_IPV6 // IPV6 support is now handled with IPVABSTRACT.
+	// By defining this, 'QuickSock' will use a 'modern' abstract approach to IP-version handling (May cause problems).
+	//#define QSOCK_IPVABSTRACT
 #else
 	#if defined(QSOCK_IPV6)
 		#undef QSOCK_IPV6
@@ -537,7 +537,7 @@ namespace quickLib
 				// Global variables:
 
 				// These variables dictate the amount of time spent detecting incoming packets:
-				static const QSOCK_INT32_LONG TIMEOUT_USEC = 15;
+				static const QSOCK_INT32_LONG TIMEOUT_USEC = 16;
 				static const QSOCK_INT32_LONG TIMEOUT_SEC = 0;
 
 				// The default max buffer-length for sockets.
@@ -711,9 +711,6 @@ namespace quickLib
 
 				QSOCK_INT32 listenSocket();
 
-				inline QSOCK_INT32 hostUpdate();
-				inline QSOCK_INT32 clientUpdate();
-
 				// Internal (Don't use this unless you want platform dependant access):
 				// This function is subject to change in the future.
 				#if defined(QSOCK_WINDOWS)
@@ -761,7 +758,6 @@ namespace quickLib
 
 				nativePort msgPort() const;
 
-				// Return type/other ('msgAddr'):
 				inline socketAddress msgAddr() const
 				{
 					return si_Destination;
@@ -1375,9 +1371,7 @@ namespace quickLib
 
 				inline bool setupDestination(socketAddress* outboundAddress)
 				{
-					static const size_type socketAddress_Length = sizeof(socketAddress);
-
-					memcpy(&so_Destination, outboundAddress+socketAddress_Length, socketAddress_Length);
+					memcpy(&so_Destination, outboundAddress, sizeof(socketAddress));
 
 					// Return the default response.
 					return true;

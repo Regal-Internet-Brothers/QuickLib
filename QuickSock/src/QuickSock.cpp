@@ -400,7 +400,7 @@ namespace quickLib
 					}
 
 					// Attempt to bind the socket.
-					bindResult = bind(_socket, boundAddress->ai_addr, boundAddress->ai_addrlen);
+					bindResult = bind(_socket, boundAddress->ai_addr, (int)boundAddress->ai_addrlen);
 
 					// Check if the bind attempt was successful.
 					if (bindResult == 0)
@@ -567,7 +567,8 @@ namespace quickLib
 			// Namespace(s):
 			using namespace std;
 
-			if (!socketClosed) return false;
+			if (!socketClosed)
+				return false;
 
 			// If we're using Monkey, convert 'address' from a Monkey-based string to a normal 'nativeString':
 			#if defined(QSOCK_MONKEYMODE)
@@ -796,41 +797,7 @@ namespace quickLib
 			clearInBuffer();
 			clearOutBuffer();
 
-			if (isServer())
-			{
-				// Run the server's update routine.
-				return hostUpdate();
-			}
-
-			// Run the client's update routine.
-			return clientUpdate();
-		}
-
-		// 'clientUpdate' & 'hostUpdate' have been moved to the main header.
-
-		// These still hold all of their code, they're just private now:
-		QSOCK_INT32 QSocket::hostUpdate()
-		{
-			// Namespace(s):
-			using namespace std;
-
-			// The main program:
-
-			// Check for messages:
-			readMsg();
-
-			// Return the default response
-			return 0;
-		}
-
-		QSOCK_INT32 QSocket::clientUpdate()
-		{
-			// Namespace(s):
-			using namespace std;
-
-			// The main program:
-
-			// Check for messages:
+			// Attempt to read an incoming message.
 			return readMsg();
 		}
 
@@ -881,8 +848,20 @@ namespace quickLib
 			// Check for messages:
 			FD_ZERO(&fd);
 			FD_SET(_socket, &fd);
-	
-			if (select(1, &fd, nullptr, nullptr, (timeval*)&tv) == SOCKET_ERROR)
+			
+			if
+			(
+				select
+				(
+					#ifndef QSOCK_WINDOWS
+						_socket,
+					#else
+						1,
+					#endif
+					
+					&fd, nullptr, nullptr, (timeval*)&tv
+				) == SOCKET_ERROR
+			)
 			{
 				return SOCKET_ERROR;
 			}
@@ -920,8 +899,18 @@ namespace quickLib
 				tv.tv_usec = 0;
 				tv.tv_sec = 0;
 
-				// DO NOT UNCOMMENT THIS.
-				select(1, &fd, nullptr, nullptr, &tv);
+				#if defined(QSOCK_WINDOWS) && !defined(QSOCK_IPVABSTRACT)
+					select
+					(
+						#ifndef QSOCK_WINDOWS
+							(int)_socket,
+						#else
+							1,
+						#endif
+						
+						&fd, nullptr, nullptr, &tv
+					);
+				#endif
 			}
 
 			tv.tv_sec = TIMEOUT_SEC;
