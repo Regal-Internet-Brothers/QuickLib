@@ -1293,8 +1293,12 @@ namespace quickLib
 
 				// The rest of the methods:
 				bool closeSocket();
-				bool close(QSOCK_INT32 nothing=0); // The 'nothing' argument was added due to problems with Unix sockets.
-		
+
+				inline bool close()
+				{
+					return closeSocket();
+				}
+				
 				// Monkey garbage collection and debugging related:
 				#if defined(QSOCK_MONKEYMODE)
 					QSocket* m_new()

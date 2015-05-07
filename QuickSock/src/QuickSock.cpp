@@ -1327,9 +1327,6 @@ namespace quickLib
 
 		// The rest of the commands:
 
-		// This is the same as closeSocket.
-		bool QSocket::close(QSOCK_INT32 nothing) { return closeSocket(); }
-
 		// Close the internal socket:
 		bool QSocket::closeSocket()
 		{
@@ -1357,9 +1354,9 @@ namespace quickLib
 
 			// Free the internal socket:
 			#if defined(QSOCK_WINDOWS)
-				if (_socket != 0 && closesocket(_socket) == SOCKET_ERROR)
+				if (_socket != 0 && ::closesocket(_socket) == SOCKET_ERROR)
 			#else
-				if (_socket != 0 && close(_socket) == SOCKET_ERROR)
+				if (_socket != 0 && ::close(_socket) == SOCKET_ERROR)
 			#endif
 				{
 					return false;
