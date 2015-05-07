@@ -1184,11 +1184,14 @@ namespace quickLib
 					return writeNativeString(str.c_str(), (uqint)length);
 				}
 
+				// Wide strings are serialized and deserialized as 16-bit.
 				inline bool write(std::wstring wstr, size_type length)
 				{
 					writeLengthOfString(length);
 
-					return writeData(wstr.c_str(), length*sizeof(std::wstring::value_type));
+					std::basic_string<QSOCK_INT16> outStr(wstr.begin(), wstr.end());
+
+					return writeData(outStr.c_str(), length*sizeof(QSOCK_INT16)); // outStr.size();
 				}
 
 				inline bool writeLengthOfString(size_type length)
@@ -1534,11 +1537,14 @@ namespace quickLib
 				return socket->readNativeString(readLengthOfString(socket));
 			}
 
+			// Wide strings are serialized and deserialized as 16-bit.
 			template <> inline std::wstring read<std::wstring>(QSocket* socket)
 			{
 				auto length = readLengthOfString(socket);
+				
+				std::basic_string<QSOCK_INT16> rawString((const QSOCK_INT16*)socket->simulatedReadBytes(length*sizeof(QSOCK_INT16)), length); // uqshort // sizeof(std::wstring::value_type)
 
-				return std::wstring((const wchar_t*)socket->simulatedReadBytes(length*sizeof(std::wstring::value_type)), length);
+				return std::wstring(rawString.begin(), rawString.end());
 			}
 
 			// Output:
