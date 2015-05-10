@@ -89,7 +89,7 @@ namespace quickLib
 
 		// Constructor(s):
 		QSOCK_EXCEPTION::QSOCK_EXCEPTION(const QSocket* target, const std::string& exception_name)
-			: std::runtime_error(exception_name), socket(target) { /* Nothing so far. */ }
+			: std::runtime_error(exception_name), sock(target) { /* Nothing so far. */ }
 
 		// QSOCK_CONSTRUCTION_EXCEPTION:
 
@@ -239,11 +239,11 @@ namespace quickLib
 					#if !defined(QSOCK_IPVABSTRACT)
 						return read<nativeIP>();
 					#else
-						return socket::nonNativeToNativeIP(read<nonNativeIP>());
+						return basic_socket::nonNativeToNativeIP(read<nonNativeIP>());
 					#endif
 				case ADDRESS_TYPE_STRING:
 					#if !defined(QSOCK_IPVABSTRACT)
-						return socket::nonNativeToNativeIP(readString());
+						return basic_socket::nonNativeToNativeIP(readString());
 					#else
 						return (nativeIP)readString();
 					#endif
@@ -411,18 +411,18 @@ namespace quickLib
 		// Methods (Protected):
 		// Nothing so far.
 
-		// socket:
+		// basic_socket:
 
 		// Global variables:
 		#if defined(QSOCK_WINDOWS)
 			// An internal data-structure required for 'WinSock'. (Used for meta-data)
-			WSADATA* socket::WSA_Data = nullptr;
+			WSADATA* basic_socket::WSA_Data = nullptr;
 		#endif
 
-		bool socket::socketsInitialized = false;
+		bool basic_socket::socketsInitialized = false;
 
 		// Functions (Public):
-		bool socket::initSockets()
+		bool basic_socket::initSockets()
 		{
 			// Check if we've initialized sockets already, if we have, do nothing:
 			if (socketsInitialized)
@@ -452,7 +452,7 @@ namespace quickLib
 			return true;
 		}
 
-		bool socket::deinitSockets()
+		bool basic_socket::deinitSockets()
 		{
 			if (!socketsInitialized)
 				return false;
@@ -472,7 +472,7 @@ namespace quickLib
 			return true;
 		}
 
-		QSOCK_UINT32_LONG socket::StringToIntIP(nativeString IP)
+		QSOCK_UINT32_LONG basic_socket::StringToIntIP(nativeString IP)
 		{
 			// Definition(s):
 			QSOCK_UINT32_LONG intIP = 0;
@@ -512,7 +512,7 @@ namespace quickLib
 			return ntohl(intIP);
 		}
 
-		nativeString socket::IntToStringIP(QSOCK_UINT32_LONG IP)
+		nativeString basic_socket::IntToStringIP(QSOCK_UINT32_LONG IP)
 		{
 			// Definition(s):
 			struct in_addr address;
@@ -531,25 +531,25 @@ namespace quickLib
 		}
 
 		// Constructor(s):
-		socket::socket() : canCloseSocket(true)
+		basic_socket::basic_socket() : canCloseSocket(true)
 		{
 			// Nothing so far.
 		}
 
-		socket::socket(SOCKET internalSocket, bool full_control)
+		basic_socket::basic_socket(SOCKET internalSocket, bool full_control)
 			: _socket(internalSocket), canCloseSocket(full_control)
 		{
 			// Nothing so far.
 		}
 
 		// Destructor(s):
-		socket::~socket()
+		basic_socket::~basic_socket()
 		{
 			closeSocket();
 		}
 
 		// Functions (Protected):
-		void socket::begin_readRemoteMessages(socket* instance, uqchar* buffer, const size_type bufferSize)
+		void basic_socket::begin_readRemoteMessages(basic_socket* instance, uqchar* buffer, const size_type bufferSize)
 		{
 			instance->readRemoteMessages(buffer, bufferSize);
 
@@ -557,10 +557,10 @@ namespace quickLib
 		}
 
 		// Methods (Public):
-		nativeString socket::strMsgIP() const
+		nativeString basic_socket::strMsgIP() const
 		{
 			#if !defined(QSOCK_IPVABSTRACT)
-				return socket::IntToStringIP(msgIP());
+				return basic_socket::IntToStringIP(msgIP());
 			#else
 				// Namespace(s):
 				using namespace std;
@@ -591,7 +591,7 @@ namespace quickLib
 			#endif
 		}
 
-		QSOCK_UINT32_LONG socket::intMsgIP() const
+		QSOCK_UINT32_LONG basic_socket::intMsgIP() const
 		{
 			#if !defined(QSOCK_IPVABSTRACT)
 				return ntohl
@@ -607,7 +607,7 @@ namespace quickLib
 			#endif
 		}
 
-		nativePort socket::msgPort() const
+		nativePort basic_socket::msgPort() const
 		{
 			// Check the destination's family, and based on that, return the internal port.
 			#if !defined(QSOCK_IPVABSTRACT)
@@ -640,7 +640,7 @@ namespace quickLib
 		}
 
 		// Initialization related:
-		bool socket::connect(nativeString address, const nativePort externalPort, const nativePort internalPort)
+		bool basic_socket::connect(nativeString address, const nativePort externalPort, const nativePort internalPort)
 		{
 			if (!socketClosed)
 				return false;
@@ -668,7 +668,7 @@ namespace quickLib
 			return true;
 		}
 
-		bool socket::host(nativePort externalPort)
+		bool basic_socket::host(nativePort externalPort)
 		{
 			// Namespace(s):
 			using namespace std;
@@ -692,12 +692,12 @@ namespace quickLib
 		}
 
 		// Deinitialization related:
-		bool socket::close()
+		bool basic_socket::close()
 		{
 			return closeSocket();
 		}
 
-		bool socket::setupDestinationV4(QSOCK_UINT32_LONG address, nativePort externalPort)
+		bool basic_socket::setupDestinationV4(QSOCK_UINT32_LONG address, nativePort externalPort)
 		{
 			#if !defined(QSOCK_IPVABSTRACT)
 				if (externalPort == (nativePort)0)
@@ -746,7 +746,7 @@ namespace quickLib
 			return false;
 		}
 
-		bool socket::setupDestination(std::string address, nativePort externalPort)
+		bool basic_socket::setupDestination(std::string address, nativePort externalPort)
 		{
 			// Namespace(s):
 			using namespace std;
@@ -824,7 +824,7 @@ namespace quickLib
 		}
 
 		// Input related:
-		void socket::readAvail(uqchar* buffer, const size_type bufferSize, rawReceiveCallback onMessageReceived)
+		void basic_socket::readAvail(uqchar* buffer, const size_type bufferSize, rawReceiveCallback onMessageReceived)
 		{
 			// No need to continue, we're already covered:
 			if (incomingThreadSwitch)
@@ -842,7 +842,7 @@ namespace quickLib
 			return;
 		}
 
-		QSOCK_INT32 socket::readAvail_Blocking(uqchar* buffer, const size_type bufferSize)
+		QSOCK_INT32 basic_socket::readAvail_Blocking(uqchar* buffer, const size_type bufferSize)
 		{
 			// Definitions:
 			QSOCK_INT32 response = 0;
@@ -867,7 +867,7 @@ namespace quickLib
 		}
 
 		// Output related:
-		QSOCK_INT32 socket::broadcastMsg(uqchar* outputBuffer, size_type outputBufferLength, nativePort port)
+		QSOCK_INT32 basic_socket::broadcastMsg(uqchar* outputBuffer, size_type outputBufferLength, nativePort port)
 		{
 			// Namespace(s):
 			using namespace std;
@@ -888,7 +888,7 @@ namespace quickLib
 			return 0;
 		}
 
-		QSOCK_INT32 socket::sendMsg(uqchar* outputBuffer, size_type outputBufferLength, QSOCK_UINT32_LONG IP, nativePort port)
+		QSOCK_INT32 basic_socket::sendMsg(uqchar* outputBuffer, size_type outputBufferLength, QSOCK_UINT32_LONG IP, nativePort port)
 		{
 			// Namespace(s):
 			using namespace std;
@@ -901,7 +901,7 @@ namespace quickLib
 			return outputMessage(outputBuffer, outputBufferLength);
 		}
 
-		QSOCK_INT32 socket::sendMsg(uqchar* outputBuffer, size_type outputBufferLength, nativeString strIP, nativePort port)
+		QSOCK_INT32 basic_socket::sendMsg(uqchar* outputBuffer, size_type outputBufferLength, nativeString strIP, nativePort port)
 		{
 			#if !defined(QSOCK_IPVABSTRACT)
 				return sendMsg(outputBuffer, outputBufferLength, StringToIntIP(strIP), port);
@@ -916,7 +916,7 @@ namespace quickLib
 			return 0;
 		}
 
-		QSOCK_INT32 socket::sendMsg(uqchar* outputBuffer, size_type outputBufferLength)
+		QSOCK_INT32 basic_socket::sendMsg(uqchar* outputBuffer, size_type outputBufferLength)
 		{
 			if
 			(
@@ -936,7 +936,7 @@ namespace quickLib
 			return outputMessage(outputBuffer, outputBufferLength);
 		}
 
-		QSOCK_INT32 socket::outputMessage(uqchar* outputBuffer, size_type outputBufferLength)
+		QSOCK_INT32 basic_socket::outputMessage(uqchar* outputBuffer, size_type outputBufferLength)
 		{
 			// Namespace(s):
 			using namespace std;
@@ -966,7 +966,7 @@ namespace quickLib
 		}
 
 		// Methods (Protected):
-		qint socket::bindInternalSocket(qint filter, const timeval* recvTimeout)
+		qint basic_socket::bindInternalSocket(qint filter, const timeval* recvTimeout)
 		{
 			// Local variable(s):
 			qint bindResult = 0;
@@ -992,7 +992,7 @@ namespace quickLib
 						continue;
 
 					// Try to create a socket.
-					_socket = socket(boundAddress->ai_family, boundAddress->ai_socktype, boundAddress->ai_protocol);
+					_socket = ::socket(boundAddress->ai_family, boundAddress->ai_socktype, boundAddress->ai_protocol);
 
 					// Check for errors while attempting socket creation:
 					if (_socket == INVALID_SOCKET)
@@ -1063,7 +1063,7 @@ namespace quickLib
 			return bindResult;
 		}
 
-		bool socket::bindSocket(const nativePort internalPort, qint nativeFilter, const timeval* nativeRecvTimeout)
+		bool basic_socket::bindSocket(const nativePort internalPort, qint nativeFilter, const timeval* nativeRecvTimeout)
 		{
 			// Setup the socket's information:
 			#if !defined(QSOCK_IPVABSTRACT)
@@ -1193,12 +1193,12 @@ namespace quickLib
 			return true;
 		}
 
-		bool socket::bindSocket(const nativePort port)
+		bool basic_socket::bindSocket(const nativePort port)
 		{
 			return bindSocket(port, -1, nullptr);
 		}
 
-		bool socket::closeSocket()
+		bool basic_socket::closeSocket()
 		{
 			// Check if this socket has been closed already:
 			if (socketClosed)
@@ -1244,7 +1244,7 @@ namespace quickLib
 		}
 
 		// Packet-management related:
-		void socket::onIncomingMessage(uqchar* buffer, const size_type length, const size_type bufferSize)
+		void basic_socket::onIncomingMessage(uqchar* buffer, const size_type length, const size_type bufferSize)
 		{
 			if (onMessageReceived)
 			{
@@ -1254,7 +1254,7 @@ namespace quickLib
 			return;
 		}
 
-		void socket::readRemoteMessages(uqchar* buffer, const size_type bufferSize)
+		void basic_socket::readRemoteMessages(uqchar* buffer, const size_type bufferSize)
 		{
 			// Keep going, only if we weren't stopped:
 			while (incomingThreadSwitch)
@@ -1282,7 +1282,7 @@ namespace quickLib
 
 		// Constructor(s):
 		QSocket::QSocket(size_type bufferlen, bool fixByteOrder)
-			: socket(), QStream(bufferlen, bufferlen, fixByteOrder)
+			: basic_socket(), QStream(bufferlen, bufferlen, fixByteOrder), messageState(MESSAGE_STATE_WAITING)
 		{
 			#if defined(QSOCK_AUTOINIT_SOCKETS)
 				if (!initSockets())
@@ -1307,7 +1307,7 @@ namespace quickLib
 		bool QSocket::close()
 		{
 			// Call the super-class's implementation.
-			if (!socket::close())
+			if (!basic_socket::close())
 				return false;
 
 			// Call our own implementation.
@@ -1329,7 +1329,7 @@ namespace quickLib
 		QSOCK_INT32 QSocket::readAvail_Blocking(uqchar* buffer, const size_type bufferSize)
 		{
 			// Call the super-class's implementation, then hold its response.
-			auto responseCode = socket::readAvail_Blocking(buffer, bufferSize);
+			auto responseCode = basic_socket::readAvail_Blocking(buffer, bufferSize);
 
 			// Check if a message was read into 'inbuffer':
 			if (responseCode > 0 && buffer == inbuffer)
@@ -1348,7 +1348,7 @@ namespace quickLib
 		{
 			this->callbackOnRemoteThread = callbackOnRemoteThread;
 
-			socket::readAvail(buffer, bufferSize, onMessageReceived);
+			basic_socket::readAvail(buffer, bufferSize, onMessageReceived);
 
 			return;
 		}
@@ -1418,7 +1418,7 @@ namespace quickLib
 			defaultTimeValue.tv_sec = DEFAULT_RECV_TIMEOUT_SEC;
 			defaultTimeValue.tv_usec = DEFAULT_RECV_TIMEOUT_USEC;
 
-			return socket::bindSocket(port, -1, &defaultTimeValue);
+			return basic_socket::bindSocket(port, -1, &defaultTimeValue);
 		}
 
 		// Deinitialization related:
@@ -1451,7 +1451,7 @@ namespace quickLib
 		void QSocket::readRemoteMessages(uqchar* buffer, const size_type bufferSize)
 		{
 			// Execute the main routine.
-			socket::readRemoteMessages(buffer, bufferSize);
+			basic_socket::readRemoteMessages(buffer, bufferSize);
 
 			return;
 		}
@@ -1462,7 +1462,7 @@ namespace quickLib
 			if (callbackOnRemoteThread)
 			{
 				// Call the super-class's implementation.
-				socket::onIncomingMessage(buffer, length, bufferSize);
+				basic_socket::onIncomingMessage(buffer, length, bufferSize);
 			}
 			else
 			{

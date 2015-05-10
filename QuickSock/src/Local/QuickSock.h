@@ -1080,7 +1080,7 @@ namespace quickLib
 
 		// This class provides the base functionality for network-sockets.
 		// For a fully featured socket class, use 'QSocket'.
-		class socket
+		class basic_socket
 		{
 			public:
 				// Typedefs:
@@ -1155,11 +1155,11 @@ namespace quickLib
 				}
 
 				// Constructor(s):
-				socket();
-				socket(SOCKET internalSocket, bool full_control=false);
+				basic_socket();
+				basic_socket(SOCKET internalSocket, bool full_control=false);
 
 				// Destructor(s):
-				virtual ~socket();
+				virtual ~basic_socket();
 
 				// Fields (Public):
 
@@ -1264,7 +1264,7 @@ namespace quickLib
 
 				// This should be used to call 'readRemoteMessages' from another thread.
 				// This will not create a new thread, but it will act as an easy to use entry-point.
-				static void begin_readRemoteMessages(socket* instance, uqchar* buffer, const size_type bufferSize);
+				static void begin_readRemoteMessages(basic_socket* instance, uqchar* buffer, const size_type bufferSize);
 
 				// Fields (Protected):
 
@@ -1373,7 +1373,7 @@ namespace quickLib
 				}
 		};
 
-		class QSocket : public socket, public QStream
+		class QSocket : public basic_socket, public QStream
 		{
 			public:
 				// Constant variable(s):
@@ -1425,7 +1425,7 @@ namespace quickLib
 				// This command only works on servers. Clients automatically call 'sendMsg':
 				inline QSOCK_INT32 broadcastMsg(nativePort port=(nativePort)0, bool resetLength=true)
 				{
-					return handleOutputOperation(socket::broadcastMsg(outbuffer, outbufferlen, port), resetLength);
+					return handleOutputOperation(basic_socket::broadcastMsg(outbuffer, outbufferlen, port), resetLength);
 				}
 
 				inline QSOCK_INT32 sendBroadcastMsg(nativePort port=(nativePort)0, bool resetLength=true)
@@ -1436,30 +1436,30 @@ namespace quickLib
 				// This overload is used for raw/native IPV4 addresses.
 				inline QSOCK_INT32 sendMsg(QSOCK_UINT32_LONG IP, nativePort port = (nativePort)0, bool resetLength = true)
 				{
-					return handleOutputOperation(socket::sendMsg(outbuffer, outbufferlen, IP, port), resetLength);
+					return handleOutputOperation(basic_socket::sendMsg(outbuffer, outbufferlen, IP, port), resetLength);
 				}
 
 				// This overload is used for string IP addresses. (IPV4, IPV6)
 				inline QSOCK_INT32 sendMsg(nativeString strIP, nativePort port=(nativePort)0, bool resetLength=true)
 				{
-					return handleOutputOperation(socket::sendMsg(outbuffer, outbufferlen, strIP, port), resetLength);
+					return handleOutputOperation(basic_socket::sendMsg(outbuffer, outbufferlen, strIP, port), resetLength);
 				}
 
 				inline QSOCK_INT32 sendMsg(bool resetLength=true)
 				{
-					return handleOutputOperation(socket::sendMsg(outbuffer, outbufferlen), resetLength);
+					return handleOutputOperation(basic_socket::sendMsg(outbuffer, outbufferlen), resetLength);
 				}
 
 				inline QSOCK_INT32 sendMsg(socketAddress* outboundAddress, bool resetLength=true)
 				{
-					return handleOutputOperation(socket::sendMsg(outbuffer, outbufferlen, outboundAddress), resetLength);
+					return handleOutputOperation(basic_socket::sendMsg(outbuffer, outbufferlen, outboundAddress), resetLength);
 				}
 
 				// When calling this method, or calling any of the general purpose send
 				// methods, the output-offset will be restored to its default position.
 				inline QSOCK_INT32 outputMessage(bool resetLength=true)
 				{
-					return handleOutputOperation(socket::outputMessage(outbuffer, outbufferlen), resetLength);
+					return handleOutputOperation(basic_socket::outputMessage(outbuffer, outbufferlen), resetLength);
 				}
 
 				// Macros:
@@ -1490,7 +1490,7 @@ namespace quickLib
 				std::condition_variable incomingThreadWait;
 
 				// This is used to represent the primary input-buffer's state.
-				std::atomic<msgState> messageState = MESSAGE_STATE_WAITING;
+				std::atomic<msgState> messageState;
 
 				// This specifies if callbacks should be executed remotely,
 				// rather than on an explicit check on a local thread.
@@ -1500,7 +1500,7 @@ namespace quickLib
 				// Methods (Protected):
 
 				// Initialization related:
-				virtual bool QSocket::bindSocket(const nativePort port) override;
+				virtual bool bindSocket(const nativePort port) override;
 
 				// Deinitialization related:
 				bool closeSocket();
@@ -1508,7 +1508,7 @@ namespace quickLib
 				// Input related:
 				void readRemoteMessages(uqchar* buffer, const size_type bufferSize) override;
 
-				// Please view the 'socket' class's documentation for details.
+				// Please view the 'basic_socket' class's documentation for details.
 				virtual void onIncomingMessage(uqchar* buffer, const size_type length, const size_type bufferSize) override;
 
 				// Output related:

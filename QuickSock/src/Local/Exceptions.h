@@ -26,7 +26,7 @@ namespace quickLib
 				virtual const std::string message() const throw() = 0;
 
 				// Fields:
-				const QSocket* socket;
+				const QSocket* sock;
 		};
 
 		class QSOCK_CONSTRUCTION_EXCEPTION final : public QSOCK_EXCEPTION
