@@ -1,9 +1,6 @@
-#ifndef QSOCK_MONKEYMODE
-	#pragma once
-#endif
+#pragma once
 	
 // Preprocessor related:
-#define QSOCK_DLL
 
 // QuickSock related:
 #if defined(_WIN32) || defined(_WIN64)
@@ -16,14 +13,8 @@
 	#endif
 #endif
 
-#if defined(QSOCK_DLL)
-	#if defined(QSOCK_MONKEYMODE) || !defined(QSOCK_WINDOWS)
-		#undef QSOCK_DLL
-	#endif
-#endif
-
 // Check if exceptions are enabled:
-#if defined(QSOCK_THROW_EXCEPTIONS) && !defined(QSOCK_MONKEYMODE)
+#if defined(QSOCK_THROW_EXCEPTIONS)
 	#define qthrow(X) throw X
 #else
 	#define qthrow(X)
@@ -43,14 +34,6 @@
 	#endif
 #endif
 
-#if defined(QSOCK_DLL)
-	#define DLLImport   __declspec( dllimport )
-	#define DLLExport   __declspec( dllexport )
-#else
-	#define DLLExport
-	#define DLLImport
-#endif
-
 #ifndef QSOCK_ERROR
 	// These can be found in the includes:
 	#if defined(QSOCK_WINDOWS)
@@ -65,10 +48,8 @@
 #endif
 
 // Includes (Internal):
-#ifndef QSOCK_MONKEYMODE
-	#include "QuickTypes.h"
-	#include "Exceptions.h"
-#endif
+#include "QuickTypes.h"
+#include "Exceptions.h"
 
 // Includes (External):
 
@@ -83,6 +64,12 @@
 #include <string>
 #include <sstream>
 #include <algorithm>
+
+#include <thread>
+#include <atomic>
+#include <condition_variable>
+#include <mutex>
+#include <chrono>
 
 // Windows specific includes:
 #if defined(QSOCK_WINDOWS)
@@ -106,21 +93,15 @@
 	// Windows Includes (Much nicer than the Linux includes section):
 	#include <windows.h>
 	
-	#if !defined(QSOCK_MONKEYMODE)
-		#include <winsock2.h>
-		#include <ws2tcpip.h>
-		#include <WSPiApi.h>
-		#include <iphlpapi.h>
+	#include <winsock2.h>
+	#include <ws2tcpip.h>
+	#include <WSPiApi.h>
+	#include <iphlpapi.h>
 
-		#if defined(QSOCK_IPVABSTRACT)
-			#include <mstcpip.h>
-		#endif
-	#else
-		#include <winsock.h>
-
-		typedef int socklen_t;
+	#if defined(QSOCK_IPVABSTRACT)
+		#include <mstcpip.h>
 	#endif
-
+	
 	#ifdef QSOCK_WIN32_L_A_M
 		#undef QSOCK_WIN32_L_A_M
 
@@ -173,10 +154,6 @@
 	// Special thanks to Adam Banko for this part of the header.
 	// In the end, I still needed to use this:
 	
-	//#ifndef QSOCK_MONKEYMODE
-	// Based on code by Adam Banko:
-	//#include "external/byteorder.h"
-
 	// If we're compiling for a processor that's big-endian, disregard these commands:
 	#ifdef WORDS_BIGENDIAN
 		#define htons(x) (x)
@@ -248,7 +225,6 @@
 			#endif
 		#endif
 	#endif
-	//#endif
 #endif
 
 // Compatibility definitions:
@@ -292,29 +268,17 @@ namespace quickLib
 	{
 		// Forward declarations:
 		class QSocket;
+		class QStream;
 
 		// Typedefs:
 		typedef unsigned short nativePort;
 
-		#if !defined(QSOCK_MONKEYMODE)
-			typedef std::string nativeString;
-		#else
-			typedef String nativeString;
-		#endif
+		typedef std::string nativeString;
 
 		typedef wchar_t Char;
 
 		#if !defined(QSOCK_IPVABSTRACT)
-			typedef
-
-			#ifdef QSOCK_MONKEYMODE
-				QSOCK_UINT32_LONG
-			#else
-				QSOCK_INT32
-			#endif
-
-			nativeIP;
-
+			typedef QSOCK_UINT32_LONG nativeIP;
 			typedef nativeString nonNativeIP;
 		#else
 			typedef nativeString nativeIP;
@@ -339,7 +303,7 @@ namespace quickLib
 
 		// Check if the 64-bit byte-order commands are already supported, if not, implement them:
 		#ifndef WORDS_BIGENDIAN
-			#if defined(__APPLE__) && defined(__MACH__) || defined(QSOCK_WINDOWS_LEGACY) || defined(QSOCK_MONKEYMODE) && defined(CFG_GLFW_USE_MINGW)
+			#if defined(__APPLE__) && defined(__MACH__) || defined(QSOCK_WINDOWS_LEGACY) // || defined(QSOCK_MONKEYMODE) && defined(CFG_GLFW_USE_MINGW)
 				inline QSOCK_UINT64 htonll(QSOCK_UINT64 inInt)
 				{
 					// Check if we're running on a big-endian system,
@@ -384,7 +348,7 @@ namespace quickLib
 		
 		// If we don't have prototypes for these byte-order related commands, declare them here:
 		#ifndef WORDS_BIGENDIAN
-			#if defined(QSOCK_WINDOWS_LEGACY) || defined(QSOCK_MONKEYMODE) && defined(CFG_GLFW_USE_MINGW)
+			#if defined(QSOCK_WINDOWS_LEGACY) // || defined(QSOCK_MONKEYMODE) && defined(CFG_GLFW_USE_MINGW)
 				unsigned long htonf(float inFloat);
 				float ntohf(unsigned long inFloat);
 				unsigned long long htond(double inFloat);
@@ -414,11 +378,7 @@ namespace quickLib
 
 		inline size_type lengthOfString(nativeString s)
 		{
-			#if !defined(QSOCK_MONKEYMODE)
-				return s.size();
-			#else
-				return (size_type)s.Length();
-			#endif
+			return s.length();
 		}
 
 		inline size_type lengthOfString(std::wstring wstr)
@@ -432,100 +392,97 @@ namespace quickLib
 		namespace IO
 		{
 			// Input:
-			inline size_type readLengthOfString(QSocket* socket);
+			inline size_type readLengthOfString(QStream& packet);
 
 			// This command will read the type specified, but it will not
 			// automatically swap the appropriate bytes of the type.
 			// To do this, please use the 'read' command.
-			template <typename type> inline type rawRead(QSocket* socket);
-			template <> inline QSOCK_UCHAR rawRead<QSOCK_UCHAR>(QSocket* socket);
+			template <typename type> inline type rawRead(QStream& packet);
+			template <> inline QSOCK_UCHAR rawRead<QSOCK_UCHAR>(QStream& packet);
 
-			template <> inline QSOCK_CHAR rawRead<QSOCK_CHAR>(QSocket* socket)
+			template <> inline QSOCK_CHAR rawRead<QSOCK_CHAR>(QStream& packet)
 			{
-				return (QSOCK_CHAR)rawRead<QSOCK_UCHAR>(socket);
+				return (QSOCK_CHAR)rawRead<QSOCK_UCHAR>(packet);
 			}
 
-			template <> inline bool rawRead<bool>(QSocket* socket)
+			template <> inline bool rawRead<bool>(QStream& packet)
 			{
-				return ((rawRead<QSOCK_UCHAR>(socket) != 0) ? true : false);
+				return ((rawRead<QSOCK_UCHAR>(packet) != 0) ? true : false);
 			}
 
 			// This acts as an automatic reading command for the type specified.
 			// When retrieving the data requested, the proper byte-order command will be used.
 			// If the speicfied type isn't directly supported, it will not be automatically byte-swapped.
-			template <typename type> inline type read(QSocket* socket);
+			template <typename type> inline type read(QStream& packet);
 
-			template <> inline QSOCK_UINT16 read<QSOCK_UINT16>(QSocket* socket);
-			template <> inline QSOCK_INT16 read<QSOCK_INT16>(QSocket* socket) { return (QSOCK_INT16)read<QSOCK_UINT16>(socket); }
+			template <> inline QSOCK_UINT16 read<QSOCK_UINT16>(QStream& packet);
+			template <> inline QSOCK_INT16 read<QSOCK_INT16>(QStream& packet) { return (QSOCK_INT16)read<QSOCK_UINT16>(packet); }
 
-			template <> inline QSOCK_UINT32_LONG read<QSOCK_UINT32_LONG>(QSocket* socket);
-			template <> inline QSOCK_INT32_LONG read<QSOCK_INT32_LONG>(QSocket* socket) { return (QSOCK_INT32_LONG)read<QSOCK_UINT32_LONG>(socket); }
+			template <> inline QSOCK_UINT32_LONG read<QSOCK_UINT32_LONG>(QStream& packet);
+			template <> inline QSOCK_INT32_LONG read<QSOCK_INT32_LONG>(QStream& packet) { return (QSOCK_INT32_LONG)read<QSOCK_UINT32_LONG>(packet); }
 
-			template <> inline QSOCK_UINT32 read<QSOCK_UINT32>(QSocket* socket) { return (QSOCK_UINT32)read<QSOCK_UINT32_LONG>(socket); }
-			template <> inline QSOCK_INT32 read<QSOCK_INT32>(QSocket* socket) { return (QSOCK_INT32)read<QSOCK_INT32_LONG>(socket); }
+			template <> inline QSOCK_UINT32 read<QSOCK_UINT32>(QStream& packet) { return (QSOCK_UINT32)read<QSOCK_UINT32_LONG>(packet); }
+			template <> inline QSOCK_INT32 read<QSOCK_INT32>(QStream& packet) { return (QSOCK_INT32)read<QSOCK_INT32_LONG>(packet); }
 
-			template <> inline QSOCK_UINT64 read<QSOCK_UINT64>(QSocket* socket);
-			template <> inline QSOCK_INT64 read<QSOCK_INT64>(QSocket* socket) { return (QSOCK_INT64)read<QSOCK_UINT64>(socket); }
+			template <> inline QSOCK_UINT64 read<QSOCK_UINT64>(QStream& packet);
+			template <> inline QSOCK_INT64 read<QSOCK_INT64>(QStream& packet) { return (QSOCK_INT64)read<QSOCK_UINT64>(packet); }
 
-			template <> inline QSOCK_FLOAT32 read<QSOCK_FLOAT32>(QSocket* socket);
-			template <> inline QSOCK_FLOAT64 read<QSOCK_FLOAT64>(QSocket* socket);
+			template <> inline QSOCK_FLOAT32 read<QSOCK_FLOAT32>(QStream& packet);
+			template <> inline QSOCK_FLOAT64 read<QSOCK_FLOAT64>(QStream& packet);
 
-			template <> inline nativeString read<nativeString>(QSocket* socket);
-			template <> inline std::wstring read<std::wstring>(QSocket* socket);
+			template <> inline nativeString read<nativeString>(QStream& packet);
+			template <> inline std::wstring read<std::wstring>(QStream& packet);
 
 			// Output:
-			inline bool writeLengthOfString(QSocket* socket, size_type length);
+			inline bool writeLengthOfString(QStream& packet, size_type length);
 
 			// This command will write the type specified, but it will not
 			// automatically swap the appropriate bytes of the type.
 			// To do this, please use the 'write' command.
-			template <typename type> inline bool rawWrite(QSocket* socket, type data);
+			template <typename type> inline bool rawWrite(QStream& packet, type data);
 
-			template <> inline bool rawWrite<QSOCK_UCHAR>(QSocket* socket, QSOCK_UCHAR data);
+			template <> inline bool rawWrite<QSOCK_UCHAR>(QStream& packet, QSOCK_UCHAR data);
 
-			template <> inline bool rawWrite<QSOCK_CHAR>(QSocket* socket, QSOCK_CHAR data)
+			template <> inline bool rawWrite<QSOCK_CHAR>(QStream& packet, QSOCK_CHAR data)
 			{
-				return rawWrite<QSOCK_UCHAR>(socket, (QSOCK_UCHAR)data);
+				return rawWrite<QSOCK_UCHAR>(packet, (QSOCK_UCHAR)data);
 			}
 
-			template <> inline bool rawWrite<bool>(QSocket* socket, bool data)
+			template <> inline bool rawWrite<bool>(QStream& packet, bool data)
 			{
-				return rawWrite<QSOCK_UCHAR>(socket, (data) ? 1 : 0);
+				return rawWrite<QSOCK_UCHAR>(packet, (data) ? 1 : 0);
 			}
 
-			template <typename type> inline bool write(QSocket* socket, type data)
+			template <typename type> inline bool write(QStream& packet, type data)
 			{
-				return rawWrite<type>(socket, data);
+				return rawWrite<type>(packet, data);
 			}
 
-			template <> inline bool write<QSOCK_UINT16>(QSocket* socket, QSOCK_UINT16 data);
-			template <> inline bool write<QSOCK_INT16>(QSocket* socket, QSOCK_INT16 data);
+			template <> inline bool write<QSOCK_UINT16>(QStream& packet, QSOCK_UINT16 data);
+			template <> inline bool write<QSOCK_INT16>(QStream& packet, QSOCK_INT16 data);
 
-			template <> inline bool write<QSOCK_UINT32_LONG>(QSocket* socket, QSOCK_UINT32_LONG data);
-			template <> inline bool write<QSOCK_INT32_LONG>(QSocket* socket, QSOCK_INT32_LONG data) { return write<QSOCK_UINT32_LONG>(socket, (QSOCK_UINT32_LONG)data); }
+			template <> inline bool write<QSOCK_UINT32_LONG>(QStream& packet, QSOCK_UINT32_LONG data);
+			template <> inline bool write<QSOCK_INT32_LONG>(QStream& packet, QSOCK_INT32_LONG data) { return write<QSOCK_UINT32_LONG>(packet, (QSOCK_UINT32_LONG)data); }
 
-			template <> inline bool write<QSOCK_UINT32>(QSocket* socket, QSOCK_UINT32 data) { return write<QSOCK_UINT32_LONG>(socket, (QSOCK_UINT32_LONG)data); }
-			template <> inline bool write<QSOCK_INT32>(QSocket* socket, QSOCK_INT32 data) { return write<QSOCK_INT32_LONG>(socket, (QSOCK_INT32_LONG)data); }
+			template <> inline bool write<QSOCK_UINT32>(QStream& packet, QSOCK_UINT32 data) { return write<QSOCK_UINT32_LONG>(packet, (QSOCK_UINT32_LONG)data); }
+			template <> inline bool write<QSOCK_INT32>(QStream& packet, QSOCK_INT32 data) { return write<QSOCK_INT32_LONG>(packet, (QSOCK_INT32_LONG)data); }
 
-			template <> inline bool write<QSOCK_UINT64>(QSocket* socket, QSOCK_UINT64 data);
-			template <> inline bool write<QSOCK_INT64>(QSocket* socket, QSOCK_INT64 data) { return write<QSOCK_UINT64>(socket, (QSOCK_UINT64)data); }
+			template <> inline bool write<QSOCK_UINT64>(QStream& packet, QSOCK_UINT64 data);
+			template <> inline bool write<QSOCK_INT64>(QStream& packet, QSOCK_INT64 data) { return write<QSOCK_UINT64>(packet, (QSOCK_UINT64)data); }
 
-			template <> inline bool write<QSOCK_FLOAT32>(QSocket* socket, QSOCK_FLOAT32 data);
-			template <> inline bool write<QSOCK_FLOAT64>(QSocket* socket, QSOCK_FLOAT64 data);
+			template <> inline bool write<QSOCK_FLOAT32>(QStream& packet, QSOCK_FLOAT32 data);
+			template <> inline bool write<QSOCK_FLOAT64>(QStream& packet, QSOCK_FLOAT64 data);
 
-			template <> inline bool write<nativeString>(QSocket* socket, nativeString str);
+			template <> inline bool write<nativeString>(QStream& packet, nativeString str);
 
-			template <> inline bool write<std::wstring>(QSocket* socket, std::wstring wstr);
+			template <> inline bool write<std::wstring>(QStream& packet, std::wstring wstr);
 		}
 
 		// Classes:
-		#ifndef QSOCK_MONKEYMODE
-		class DLLExport QSocket
+
+		// DO NOT pass 'QStream' objects by data, unless you want to perform a deep-copy.
+		typedef class QStream
 		{
-		#else
-		class QSocket : public Object
-		{
-		#endif
 			public:
 				// Enumerator(s):
 				enum addressType : uqchar
@@ -534,28 +491,11 @@ namespace quickLib
 					ADDRESS_TYPE_STRING = 1,
 				};
 
-				// Global variables:
-
-				// These variables dictate the amount of time spent detecting incoming packets:
-				static const QSOCK_INT32_LONG TIMEOUT_USEC = 16;
-				static const QSOCK_INT32_LONG TIMEOUT_SEC = 0;
-
-				// The default max buffer-length for sockets.
-				static const size_type DEFAULT_BUFFERLEN = 1024;
-
-				// A global boolean stating if sockets have been initialized or not.
-				static bool socketsInitialized;
-
-				// All meta-data specified by WinSock upon initialization (Windows only).
-				#if defined(QSOCK_WINDOWS)
-					static WSADATA* WSA_Data;
-				#endif
-
 				// Functions:
 
 				// This will transfer the contents of 'source' to 'destination', using the sub-script operator.
 				template <typename TypeA, typename TypeB = TypeA>
-				static size_type smartTransfer(TypeA source, TypeB destination, size_type count, size_type sourceOffset = 0, size_type destinationOffset = 0)
+				static inline size_type smartTransfer(TypeA source, TypeB destination, size_type count, size_type sourceOffset = 0, size_type destinationOffset = 0)
 				{
 					for (size_type i = 0; i < count; i++)
 						source[i + sourceOffset] = destination[i + destinationOffset];
@@ -564,206 +504,64 @@ namespace quickLib
 				}
 
 				// The return value of this command is the number of bytes transferred.
-				static size_type rawTransfer(const void* source, void* destination, size_type count, size_type sourceOffsetInBytes=0, size_type destinationOffsetInBytes=0)
+				static inline size_type rawTransfer(const void* source, void* destination, size_type count, size_type sourceOffsetInBytes=0, size_type destinationOffsetInBytes=0)
 				{
 					memcpy((uqchar*)destination + destinationOffsetInBytes, (const uqchar*)source + sourceOffsetInBytes, count);
 
 					return count;
 				}
 
-				// The real IP conversion commands:
-				#ifdef QSOCK_MONKEYMODE
-					static QSOCK_INT32 StringToIntIP(nativeString IP);
-					static nativeString IntToStringIP(QSOCK_INT32 IP);
-				#else
-					static QSOCK_UINT32_LONG StringToIntIP(nativeString IP);
-					static nativeString IntToStringIP(QSOCK_UINT32_LONG IP);
-				#endif
-
-				// These commands are here for the sake of compatibility:
-				static inline QSOCK_UINT32_LONG StringToIntIP(QSOCK_UINT32_LONG IP)
-				{
-					// Return the input.
-					return IP;
-				}
-
-				static inline nativeString IntToStringIP(nativeString IP)
-				{
-					// Return the input.
-					return IP;
-				}
-
-				static inline nonNativeIP nativeToNonNativeIP(nativeIP input)
-				{
-					#if !defined(QSOCK_IPVABSTRACT)
-						return IntToStringIP(input);
-					#else
-						return StringToIntIP(input);
-					#endif
-				}
-
-				static inline nativeIP nonNativeToNativeIP(nonNativeIP input)
-				{
-					#if !defined(QSOCK_IPVABSTRACT)
-						return StringToIntIP(input);
-					#else
-						return IntToStringIP(input);
-					#endif
-				}
-
-				// These commands are here for the sake of compatibility:
-				static inline nativeIP nonNativeToNativeIP(nativeIP input)
-				{
-					return input;
-				}
-
-				static inline nonNativeIP nativeToNonNativeIP(nonNativeIP input)
-				{
-					return input;
-				}
-
-				static inline nativeString representIP(nativeIP input)
-				{
-					return nativeToNonNativeIP(input);
-				}
-
-				// Constructors & Destructors:
-				QSocket(size_type bufferLength=0, bool fixByteOrder=true);
-				~QSocket();
-
 				// Fields (Public):
+				
+				// A buffer dedicated to inbound data.
+				uqchar* inbuffer; // = nullptr;
 
-				// The input and output buffers:
-				uqchar* inbuffer;
-				uqchar* outbuffer;
+				// A buffer dedicated to outbound data.
+				uqchar* outbuffer; // = nullptr;
 
-				// The length variables for each buffer:
-				size_type _bufferlen;
-				size_type inbufferlen;
-				size_type outbufferlen;
+				// The real size of the input-buffer. (Maximum)
+				size_type inbufferSize;
+				
+				// The real size of the output-buffer. (Maximum)
+				size_type outbufferSize;
 
-				// The read & write offsets:
-				streamLocation readOffset;
-				streamLocation writeOffset;
+				// The currently allocated area of the 'inbuffer'.
+				size_type inbufferlen = 0;
 
-				// The destinations used for sending and receiving packets.
-				socketAddress si_Destination, so_Destination;
+				// The current size of the output-area.
+				size_type outbufferlen = 0;
 
-				bool fixByteOrder;
+				// The current read-position in the 'inbuffer'.
+				streamLocation readOffset = 0;
 
-				// Functions (Public):
-				static bool initSockets(size_type bufferlen=DEFAULT_BUFFERLEN);
-				static bool deinitSockets();
+				// The current write-position in the 'outbuffer'.
+				streamLocation writeOffset = 0;
+
+				// If enabled, the byte order of explicitly
+				// supported types will be corrected. (Network byte-order)
+				bool fixByteOrder = true;
+
+				// Constructor(s) (Public):
+
+				// This class reserves the right to mutate the buffers specified.
+				QStream(uqchar* inputBuffer, uqchar* outputBuffer, size_type inBuffer_size, size_type outBuffer_size, bool fixBOrder=true);
+				
+				// This overload acts as shorthand for setting up a 'QStream' without an output buffer.
+				QStream(uqchar* inputBuffer, size_type inBuffer_size, bool fixBOrder=true);
+
+				// This will automatically allocate "managed" buffers.
+				QStream(size_type inBuffer_size, size_type outBuffer_size, bool fixBOrder=true);
+				QStream(size_type buffer_size, bool fixBOrder=true);
+
+				// This constructor performs a deep copy.
+				explicit QStream(const QStream& copyDataFrom);
+
+				// Destructor(s):
+				~QStream();
 
 				// Methods (Public):
 
-				// General methods:
-				inline bool isServer() const { return _isServer; }
-				inline bool isClosed() const { return socketClosed; }
-
-				// Initialization related:
-				#if !defined(QSOCK_MONKEYMODE)
-					bool connect(nativeString address, const nativePort ePort, nativePort iPort=(nativePort)0);
-				#else
-					bool connect(nativeString address, const QSOCK_INT32 externalPort, const QSOCK_INT32 internalPort);
-				#endif
-
-				// Platform specific arguments:
-				#if !defined(QSOCK_MONKEYMODE)
-					// Return type/other ('connect').
-					inline bool connect(QSOCK_INT32_LONG address, const nativePort ePort, const nativePort iPort=(nativePort)0)
-					{
-						return connect(IntToStringIP(ntohl(htonl((QSOCK_UINT32_LONG)address))), (nativePort)ePort, (nativePort)iPort);
-					}
-				#endif
-
-				// Return type/other (directConnect).
-				inline bool
-
-				// Platform specific arguments:
-				#if defined(QSOCK_MONKEYMODE)
-					directConnect(QSOCK_INT32 address, const QSOCK_INT32 ePort, const QSOCK_INT32 iPort
-				#else
-					directConnect(QSOCK_INT32_LONG address, const nativePort ePort, const nativePort iPort
-				#endif
-
-				=(nativePort)0)
-				{
-					return connect(address, (nativePort)ePort, (nativePort)iPort);
-				}
-
-				bool host
-				(
-					#if defined(QSOCK_MONKEYMODE)
-						const QSOCK_INT32 ePort
-					#else
-						const nativePort ePort
-					#endif
-				);
-
-				// Update related:
-
-				// These four do the same thing:
-				inline QSOCK_INT32 updateSocket() { return listenSocket(); }
-				inline QSOCK_INT32 update() { return listenSocket(); }
-				inline QSOCK_INT32 listen() { return listenSocket(); }
-				inline QSOCK_INT32 socketListen() { return listenSocket(); }
-
-				QSOCK_INT32 listenSocket();
-
-				// Internal (Don't use this unless you want platform dependant access):
-				// This function is subject to change in the future.
-				#if defined(QSOCK_WINDOWS)
-					inline SOCKET* getSocket() { return &_socket; }
-				#else
-					inline unsigned int getSocket() { return _socket; }
-				#endif
-
-				// Input related:
-				QSOCK_INT32 readAvail();
-				QSOCK_INT32 readMsg();
-
-				bool clearInBuffer();
-
-				inline bool msgAvail() const
-				{
-					return ((inbufferlen-readOffset) > 0);
-				}
-
-				inline nativeIP msgIP() const
-				{
-					return nativeMsgIP();
-				}
-
-				nativeString strMsgIP() const;
-				QSOCK_UINT32_LONG intMsgIP() const;
-
-				inline nativeIP nativeMsgIP() const
-				{
-					#if !defined(QSOCK_IPVABSTRACT)
-						return intMsgIP();
-					#else
-						return strMsgIP();
-					#endif
-				}
-
-				inline nonNativeIP nonNativeMsgIP()
-				{
-					#if !defined(QSOCK_IPVABSTRACT)
-						return strMsgIP();
-					#else
-						return intMsgIP();
-					#endif
-				}
-
-				nativePort msgPort() const;
-
-				inline socketAddress msgAddr() const
-				{
-					return si_Destination;
-				}
-
-				// General purpose:
+				// Meta:
 				inline bool canRead(size_type count) const
 				{
 					return ((count != 0) && (((size_type)readOffset) + count) <= inbufferlen);
@@ -771,7 +569,7 @@ namespace quickLib
 
 				inline bool canWrite(size_type count) const
 				{
-					return ((count != 0) && (((size_type)writeOffset) + count) <= _bufferlen);
+					return ((count != 0) && (((size_type)writeOffset) + count) <= outbufferSize);
 				}
 
 				inline bool canRead() const
@@ -781,7 +579,7 @@ namespace quickLib
 
 				inline bool canWrite() const
 				{
-					return (writeOffset < _bufferlen);
+					return (writeOffset < outbufferSize);
 				}
 
 				size_type inBytesLeft() const
@@ -791,12 +589,14 @@ namespace quickLib
 
 				size_type outBytesLeft() const
 				{
-					return (_bufferlen - (size_type)writeOffset);
+					return (outbufferSize - (size_type)writeOffset);
 				}
+
+				// Stream management routines:
 
 				// This command will not "zero out" the internal input-buffer.
 				// Instead, it will simply act as if the buffer doesn't contain anything.
-				void flushInput()
+				inline void flushInput()
 				{
 					inbufferlen = 0;
 					readOffset = 0;
@@ -806,7 +606,7 @@ namespace quickLib
 
 				// This command will not "zero out" the internal output-buffer.
 				// Instead, it will simply act as if the buffer doesn't contain anything.
-				void flushOutput()
+				inline void flushOutput()
 				{
 					outbufferlen = 0;
 					writeOffset = 0;
@@ -881,7 +681,7 @@ namespace quickLib
 
 				inline streamLocation outSeek(streamLocation position)
 				{
-					if (position > _bufferlen)
+					if (position > outbufferSize)
 					{
 						qthrow(QSOCK_SEEK_EXCEPTION(this, QSOCK_SEEK_EXCEPTION::seekMode::SEEK_MODE_OUT, position));
 
@@ -909,6 +709,13 @@ namespace quickLib
 				// This command resets the write-offset to the default/zero.
 				inline void resetWrite() { outSeek(0); return; }
 
+				// This command manually clears the input-buffer. (High overhead)
+				bool clearInBuffer();
+
+				// This command manually clears the output-buffer. (High overhead)
+				bool clearOutBuffer();
+
+				// Input routines:
 				bool readData(void* output, size_type size, size_type output_offset = 0, bool checkRead = true);
 
 				// This command will read the type specified, but it will not
@@ -916,12 +723,12 @@ namespace quickLib
 				// To do this, please use the 'read' command.
 				template <typename type> inline type rawRead()
 				{
-					return IO::rawRead<type>(this);
+					return IO::rawRead<type>(*this);
 				}
 
 				template <typename type> inline type read()
 				{
-					return IO::read<type>(this);
+					return IO::read<type>(*this);
 				}
 
 				// Type-specific macros:
@@ -941,30 +748,10 @@ namespace quickLib
 
 				inline size_type readLengthOfString()
 				{
-					return IO::readLengthOfString(this);
+					return IO::readLengthOfString(*this);
 				}
 
-				inline nativeIP readIP()
-				{
-					switch (read<addressType>())
-					{
-						case ADDRESS_TYPE_INTEGER:
-							#if !defined(QSOCK_IPVABSTRACT)
-								return read<nativeIP>();
-							#else
-								return nonNativeToNativeIP(read<nonNativeIP>());
-							#endif
-						case ADDRESS_TYPE_STRING:
-							#if !defined(QSOCK_IPVABSTRACT)
-								return nonNativeToNativeIP(readString());
-							#else
-								return (nativeIP)readString();
-							#endif
-					}
-
-					// If all else fails, return a blank IP address.
-					return nativeIP();
-				}
+				nativeIP readIP();
 
 				// This overload returns 'true' if operations were successful.
 				// The 'checkRead' argument is generally reserved, and should not be used externally.
@@ -1017,15 +804,12 @@ namespace quickLib
 					return (qchar*)simulatedUReadBytes(count);
 				}
 
-				inline nativeString readNativeString(size_type length=0)
+				// Other types:
+				inline nativeString readNativeString(size_type length)
 				{
-					const char* characters = (char*)(inbuffer + readOffset);
-
-					#if !defined(QSOCK_MONKEYMODE)
-						return nativeString(characters, characters+length);
-					#else
-						return nativeString(characters, length);
-					#endif
+					// Simulate a read operation based on the length specified.
+					// Then, use the output to build a 'nativeString'.
+					return nativeString((const char*)simulatedReadBytes(length), (const char*)inbuffer);
 				}
 
 				inline nativeString readString()
@@ -1048,40 +832,14 @@ namespace quickLib
 
 				inline nativeString readstdLine() { return readLine(); }
 
-				// Output related:
-
-				// This command only works on servers. Clients automatically call 'sendMsg':
-				QSOCK_INT32 broadcastMsg(nativePort port=(nativePort)0, bool resetLength=true);
-				inline QSOCK_INT32 sendBroadcastMsg(nativePort port, bool resetLength=true) { return broadcastMsg(port, resetLength); }
-		
-				#if defined(QSOCK_MONKEYMODE)
-					// Comments can be found below.
-					QSOCK_INT32 sendMsg(QSOCK_INT32 IP, QSOCK_INT32 port=0, bool resetLength=true);
-					QSOCK_INT32 sendMsg(nativeString IP, QSOCK_INT32 port=0, bool resetLength=true);
-				#else
-					// This overload is used for raw/native IPV4 addresses.
-					QSOCK_INT32 sendMsg(QSOCK_UINT32_LONG IP, nativePort port=(nativePort)0, bool resetLength=true);
-
-					// This overload is used for string IP addresses. (IPV4, IPV6)
-					QSOCK_INT32 sendMsg(nativeString strIP, nativePort port=(nativePort)0, bool resetLength=true);
-				#endif
-
-				QSOCK_INT32 sendMsg(bool resetLength=true);
-
-				inline QSOCK_INT32 sendMsg(socketAddress* outboundAddress, bool resetLength=true)
-				{
-					if (!setupDestination(outboundAddress))
-						return SOCKET_ERROR;
-
-					return outputMessage(resetLength);
-				}
+				// Output routines:
 
 				// This command will manually set the output-offset, blanking memory as it becomes "out of scope".
 				// The region between the current offset, and the position specified will be "zeroed out".
 				// Use this with caution; use 'outSeek' if the intention is to normally "seek".
 				inline streamLocation setWrite(streamLocation position)
 				{
-					position = std::min(position, _bufferlen);
+					position = std::min(position, outbufferSize);
 
 					if (position > writeOffset)
 						flushOutputRegion(position-writeOffset);
@@ -1105,16 +863,14 @@ namespace quickLib
 					return outbufferlen;
 				}
 
-				bool clearOutBuffer();
-
 				// Buffer writing related:
 
 				// This command will safely flush a region of the output-buffer.
 				// This is useful when seeking around the output "stream".
 				inline void flushOutputRegion(streamLocation position, size_type amount)
 				{
-					if (position+amount > _bufferlen)
-						amount = (_bufferlen-position);
+					if (position+amount > outbufferSize)
+						amount = (outbufferSize-position);
 
 					memset(outbuffer + position, 0, amount);
 
@@ -1132,7 +888,7 @@ namespace quickLib
 				// This will flush all bytes following the current write-offset.
 				inline void flushOutputRegion()
 				{
-					flushOutputRegion(_bufferlen-writeOffset);
+					flushOutputRegion(outbufferSize-writeOffset);
 
 					return;
 				}
@@ -1142,7 +898,7 @@ namespace quickLib
 				// length specified if it was out of bounds.
 				inline void setOutputLength(streamLocation length)
 				{
-					outbufferlen = std::min(length, _bufferlen);
+					outbufferlen = std::min(length, outbufferSize);
 					writeOffset = std::min(writeOffset, outbufferlen);
 
 					return;
@@ -1155,7 +911,7 @@ namespace quickLib
 
 					return;
 				}
-		
+				
 				// The generic writing command for raw data. ('size' is in bytes)
 				bool writeData(const void* input, size_type size, size_type input_offset=0);
 
@@ -1164,12 +920,12 @@ namespace quickLib
 				// To do this, please use the 'write' command.
 				template <typename type> inline bool rawWrite(type data)
 				{
-					return IO::rawWrite<type>(this, data);
+					return IO::rawWrite<type>(*this, data);
 				}
 
 				template <typename type> inline bool write(type data)
 				{
-					return IO::write<type>(this, data);
+					return IO::write<type>(*this, data);
 				}
 
 				inline bool write(nativeString str, size_type length)
@@ -1192,7 +948,7 @@ namespace quickLib
 
 				inline bool writeLengthOfString(size_type length)
 				{
-					return IO::writeLengthOfString(this, length);
+					return IO::writeLengthOfString(*this, length);
 				}
 
 				inline bool writeLengthOfString(nativeString s)
@@ -1246,11 +1002,7 @@ namespace quickLib
 				// Other types:
 
 				// This does not serialize the length of the string, to do this, either use 'writeString', or use 'writeLine'.
-				#if !defined(QSOCK_MONKEYMODE)
-					inline bool writeNativeString(nativeString str) { return writeBytes((const qchar*)str.c_str(), str.length()); }
-				#else
-					inline bool writeNativeString(String s) { return writeBytes((const qchar*)s.ToCString<qchar>(), s.Length()); }
-				#endif
+				inline bool writeNativeString(nativeString str) { return writeBytes((const qchar*)str.c_str(), str.length()); }
 
 				inline bool writeNativeString(const QSOCK_CHAR* str, uqint length=0) { return writeBytes((const qchar*)str, (length != 0) ? length : strlen(str)); }
 
@@ -1274,78 +1026,15 @@ namespace quickLib
 					return write(wstr, length);
 				}
 
-				// Standard-line related:
+				// Line related:
 				bool writeLine(const QSOCK_CHAR* strIn, size_type length=0);
 
 				inline bool writeLine(std::string str) { return writeLine(str.c_str(), str.length()); }
 				inline bool writestdLine(std::string str) { return writeLine(str); }
 
-				#if defined(QSOCK_MONKEYMODE)
-					inline bool writeLine(String s)
-					{
-						return writeLine(s.ToCString<QSOCK_CHAR>(), (uqint)s.Length());
-					}
-				#endif
-
-				// The rest of the methods:
-				bool closeSocket();
-
-				inline bool close()
-				{
-					return closeSocket();
-				}
-				
-				// Monkey garbage collection and debugging related:
-				#if defined(QSOCK_MONKEYMODE)
-					QSocket* m_new()
-					{
-						#if defined(CFG_QSOCK_DEBUG_ENABLED)
-							DBG_ENTER("Native: QuickSock")
-							//DBG_LOCAL((QSocket*)this, "Self")
-							DBG_INFO("Unable to find location.");
-						#endif
- 
-						return this;
-					}
-
-					void mark() { Object::mark(); return; }
-
-					#if defined(CFG_QSOCK_DEBUG_ENABLED)
-						nativeString debug()
-						{
-							nativeString t = L"(QSocket)\n";
-
-							// Other:
-							t += dbg_decl("Internal_Socket", (int*)&_socket);
-							//t += dbg_decl("Port", &port);
-
-							// Offsets:
-							t += dbg_decl("ReadOffset", &readOffset);
-							t += dbg_decl("WriteOffset", &writeOffset);
-
-							// Flags/Booleans:
-							/*
-							t += dbg_decl("IsServer", &_isServer);
-							t += dbg_decl("SocketClosed", &socketClosed);
-							t += dbg_decl("Manually_Deleted", &manualDelete);
-							t += dbg_decl("Broadcast_Supported", broadcastSupported);
-							*/
-
-							// Lengths:
-							t += dbg_decl("In_Buffer_Length", &inbufferlen);
-							t += dbg_decl("Out_Buffer_Length", &outbufferlen);
-							t += dbg_decl("Maximum_Buffer_Length", &_bufferlen);
-
-							return t;
-						}
-
-						nativeString dbg_type(QSocket**s) { return "QSocket"; }
-					#endif
-				#endif
-
-				// Operators (This class is still not standard I/O stream compliant):
+				// Operators:
 				template <typename T>
-				inline const QSocket& operator<<(T data)
+				inline QStream& operator<<(T data)
 				{
 					write<T>(data);
 
@@ -1353,14 +1042,315 @@ namespace quickLib
 				}
 
 				template <typename T>
-				inline const QSocket& operator>>(T& outputVariable)
+				inline QStream& operator>>(T& outputVariable)
 				{
 					outputVariable = read<T>();
 
 					return *this;
 				}
-			private:
-				// Methods (Private):
+			protected:
+				// Constructor(s) (Protected):
+
+				// This command is completely "unsafe". Please call 'deallocateBuffers'
+				// before using this on an already constructed 'QStream'.
+				void allocateBuffers(size_type inBuffer_size, size_type outBuffer_size);
+
+				// This works the same as 'allocateBuffers', the only difference is, this will assign the internal max-sizes.
+				inline void allocateAndApplyBuffers(size_type inBuffer_size, size_type outBuffer_size)
+				{
+					// Allocate the requested buffers.
+					allocateBuffers(inBuffer_size, outBuffer_size);
+
+					// Set the maximum sizes of these buffers.
+					inbufferSize = inBuffer_size;
+					outbufferSize = outBuffer_size;
+
+					return;
+				}
+
+				// Destructor(s) (Protected):
+
+				// This command will deallocate the internal buffers,
+				// as well as change any relevant meta-data.
+				void deallocateBuffers();
+
+				// Methods (Protected):
+				// Nothing so far.
+		} QPacket;
+
+		// This class provides the base functionality for network-sockets.
+		// For a fully featured socket class, use 'QSocket'.
+		class socket
+		{
+			public:
+				// Typedefs:
+
+				// This is used to represent when a packet is received. The arguments are:
+				// The input-buffer, the amount used from that buffer, and the maximum size of the buffer.
+				typedef std::function<void(uqchar*, size_type, size_type)> rawReceiveCallback;
+
+				// Global variable(s):
+
+				// A global boolean stating if sockets have been initialized or not.
+				static bool socketsInitialized;
+
+				// All meta-data specified by WinSock upon initialization (Windows only).
+				#if defined(QSOCK_WINDOWS)
+					static WSADATA* WSA_Data;
+				#endif
+
+				// Functions (Public):
+				static bool initSockets();
+				static bool deinitSockets();
+
+				// IP format-conversion commands:
+				static QSOCK_UINT32_LONG StringToIntIP(nativeString IP);
+				static nativeString IntToStringIP(QSOCK_UINT32_LONG IP);
+
+				// These commands are here for the sake of compatibility:
+				static inline QSOCK_UINT32_LONG StringToIntIP(QSOCK_UINT32_LONG IP)
+				{
+					// Return the input.
+					return IP;
+				}
+
+				static inline nativeString IntToStringIP(nativeString IP)
+				{
+					// Return the input.
+					return IP;
+				}
+
+				static inline nonNativeIP nativeToNonNativeIP(nativeIP input)
+				{
+					#if !defined(QSOCK_IPVABSTRACT)
+						return IntToStringIP(input);
+					#else
+						return StringToIntIP(input);
+					#endif
+				}
+
+				static inline nativeIP nonNativeToNativeIP(nonNativeIP input)
+				{
+					#if !defined(QSOCK_IPVABSTRACT)
+						return StringToIntIP(input);
+					#else
+						return IntToStringIP(input);
+					#endif
+				}
+
+				// These commands are here for the sake of compatibility:
+				static inline nativeIP nonNativeToNativeIP(nativeIP input)
+				{
+					return input;
+				}
+
+				static inline nonNativeIP nativeToNonNativeIP(nonNativeIP input)
+				{
+					return input;
+				}
+
+				static inline nativeString representIP(nativeIP input)
+				{
+					return nativeToNonNativeIP(input);
+				}
+
+				// Constructor(s):
+				socket();
+				socket(SOCKET internalSocket, bool full_control=false);
+
+				// Destructor(s):
+				virtual ~socket();
+
+				// Fields (Public):
+
+				// The destinations used for sending and receiving packets.
+				socketAddress si_Destination, so_Destination;
+
+				// Methods (Public):
+				inline bool isServer() const { return _isServer; }
+				inline bool isClosed() const { return socketClosed; }
+
+				// Internal (Don't use this unless you want platform dependent access):
+				// This command is subject to change in the future.
+				#if defined(QSOCK_WINDOWS)
+					inline SOCKET& getSocket() { return _socket; }
+				#else
+					inline unsigned int& getSocket() { return _socket; }
+				#endif
+
+				inline nativeIP msgIP() const
+				{
+					return nativeMsgIP();
+				}
+
+				nativeString strMsgIP() const;
+				QSOCK_UINT32_LONG intMsgIP() const;
+
+				inline nativeIP nativeMsgIP() const
+				{
+					#if !defined(QSOCK_IPVABSTRACT)
+						return intMsgIP();
+					#else
+						return strMsgIP();
+					#endif
+				}
+
+				inline nonNativeIP nonNativeMsgIP() const
+				{
+					#if !defined(QSOCK_IPVABSTRACT)
+						return strMsgIP();
+					#else
+						return intMsgIP();
+					#endif
+				}
+
+				nativePort msgPort() const;
+
+				// This returns the native address this socket last received from.
+				inline socketAddress msgAddr() const
+				{
+					return si_Destination;
+				}
+
+				// Input related:
+
+				// This is the preferred overload for call-back-based message detection.
+				virtual void readAvail(uqchar* buffer, const size_type bufferSize, rawReceiveCallback onMessageReceived);
+
+				// This acts as the primary implementation for 'readAvail'.
+				// The current system used is partially asynchronous.
+				// This means calling this manually isn't ideal, and may result in undefined behavior.
+				virtual QSOCK_INT32 readAvail_Blocking(uqchar* buffer, const size_type bufferSize);
+
+				// Output related:
+
+				// This command only works on servers. Clients automatically call 'sendMsg':
+				QSOCK_INT32 broadcastMsg(uqchar* outputBuffer, size_type outputBufferLength, nativePort port=(nativePort)0);
+				
+				// This overload is used for raw/native IPV4 addresses.
+				QSOCK_INT32 sendMsg(uqchar* outputBuffer, size_type outputBufferLength, QSOCK_UINT32_LONG IP, nativePort port=(nativePort)0);
+
+				// This overload is used for string IP addresses. (IPV4, IPV6)
+				QSOCK_INT32 sendMsg(uqchar* outputBuffer, size_type outputBufferLength, nativeString strIP, nativePort port=(nativePort)0);
+
+				QSOCK_INT32 sendMsg(uqchar* outputBuffer, size_type outputBufferLength);
+
+				inline QSOCK_INT32 sendMsg(uqchar* outputBuffer, size_type outputBufferLength, socketAddress* outboundAddress)
+				{
+					if (!setupDestination(outboundAddress))
+						return SOCKET_ERROR;
+
+					return outputMessage(outputBuffer, outputBufferLength);
+				}
+
+				// Initialization related:
+				bool connect(nativeString address, const nativePort ePort, nativePort iPort=(nativePort)0);
+				bool host(const nativePort ePort);
+
+				inline bool connect(QSOCK_UINT32_LONG address, const nativePort ePort, const nativePort iPort=(nativePort)0)
+				{
+					return connect(IntToStringIP(address), (nativePort)ePort, (nativePort)iPort);
+				}
+
+				inline bool directConnect(QSOCK_UINT32_LONG address, const nativePort ePort, const nativePort iPort=(nativePort)0)
+				{
+					return connect(address, (nativePort)ePort, (nativePort)iPort);
+				}
+
+				// Deinitialization related:
+				virtual bool close();
+			protected:
+				// Functions (Protected):
+
+				// This should be used to call 'readRemoteMessages' from another thread.
+				// This will not create a new thread, but it will act as an easy to use entry-point.
+				static void begin_readRemoteMessages(socket* instance, uqchar* buffer, const size_type bufferSize);
+
+				// Fields (Protected):
+
+				// The final address-result(s):
+
+				// 'boundAddress' points to the element of 'result' which is used to bind the internal socket.
+				#if !defined(QSOCK_IPVABSTRACT)
+					socketAddress* result = nullptr;
+					socketAddress* boundAddress = nullptr;
+				#else
+					addrinfo* result = nullptr;
+					addrinfo* boundAddress = nullptr;
+				#endif
+
+				// The hints used to evaluate addresses (Protocols, 'IP families', etc).
+				addrinfo hints;
+
+				// Internal socket:
+				#if defined(QSOCK_WINDOWS)
+					SOCKET _socket = INVALID_SOCKET;
+				#else
+					unsigned int _socket = INVALID_SOCKET;
+				#endif
+
+				// The connection port (Host: Local/Server port, Client: External / Remote server's port).
+				nativePort port = 0;
+
+				// A thread dedicated to waiting for (And potentially reading) inbound packets.
+				std::thread incomingThread;
+
+				// A call-back for packet/message notifications.
+				rawReceiveCallback onMessageReceived;
+
+				// Booleans / Flags:
+
+				// A boolean describing the connection-mode; server or client.
+				bool _isServer = false;
+
+				// A simple boolean for the state of the socket.
+				bool socketClosed = true; // false;
+
+				// This specifies if the '_socket' variable may be modified.
+				bool canCloseSocket = true;
+
+				// This specifies if broadcasting is supported by this socket.
+				bool broadcastSupported = false;
+
+				// A boolean used to manually close 'incomingThread'.
+				std::atomic<bool> incomingThreadSwitch;
+
+				// Methods (Protected):
+
+				// Initialization related:
+				qint bindInternalSocket(qint filter=-1, const timeval* recvTimeout=nullptr);
+				bool bindSocket(const nativePort port, qint nativeFilter, const timeval* nativeRecvTimeout);
+
+				virtual bool bindSocket(const nativePort port);
+
+				// Deinitialization related:
+				inline qint shutdownInternalSocket()
+				{
+					qint response = shutdown(_socket, SD_BOTH);
+
+					if (response == 0)
+					{
+						// Set the internal socket to an "invalid socket".
+						_socket = INVALID_SOCKET;
+					}
+
+					return response;
+				}
+
+				bool closeSocket();
+
+				// Packet-management related:
+
+				// This is called every time a packet/message is received from 'incomingThread'.
+				virtual void onIncomingMessage(uqchar* buffer, const size_type length, const size_type bufferSize);
+
+				// This acts as the entry-point for asynchronous message reading.
+				virtual void readRemoteMessages(uqchar* buffer, const size_type bufferSize);
+
+				// This will output the buffer specified to this socket's destination.
+				QSOCK_INT32 outputMessage(uqchar* outputBuffer, size_type outputBufferLength);
+
+				// Destination related:
 				bool setupDestinationV4(QSOCK_UINT32_LONG address, nativePort externalPort);
 				bool setupDestination(std::string address, nativePort externalPort);
 
@@ -1379,98 +1369,161 @@ namespace quickLib
 
 				inline bool setupDestination()
 				{
-					return setupDestination(msgIP(), msgPort());
+					return setupDestination(&si_Destination); // msgIP(), msgPort()
+				}
+		};
+
+		class QSocket : public socket, public QStream
+		{
+			public:
+				// Constant variable(s):
+
+				// The default max buffer-length for sockets.
+				static const size_type DEFAULT_BUFFERLEN = 1024;
+
+				// Fields (Public):
+
+				// Constructor(s):
+				QSocket(size_type bufferLength=DEFAULT_BUFFERLEN, bool fixByteOrder=true);
+
+				// Destructor(s):
+				~QSocket();
+
+				// Methods (Public):
+
+				// Deinitialization related:
+				virtual bool close() override;
+
+				// Input related:
+
+				// This method is no longer 'const'.
+				bool msgAvail();
+
+				virtual QSOCK_INT32 readAvail_Blocking(uqchar* buffer, const size_type bufferSize) override;
+
+				// This is the preferred overload for call-back-based message detection.
+				// The 'callbackOnRemoteThread' argument specifies if the call-back
+				// will be executed remotely, or when the main 'readAvail' overload is called.
+				void readAvail(uqchar* buffer, const size_type bufferSize, rawReceiveCallback onMessageReceived, bool callbackOnRemoteThread);
+				virtual void readAvail(uqchar* buffer, const size_type bufferSize, rawReceiveCallback onMessageReceived) override;
+
+				inline void readAvail(rawReceiveCallback onMessageReceived, bool callbackOnRemoteThread)
+				{
+					// Call the thread-start routine.
+					readAvail(inbuffer, inbufferSize, onMessageReceived, callbackOnRemoteThread);
+
+					return;
+				}
+
+				// This acts as the front-end for the main message-detection routine.
+				// This may be called continuously in order to read packets.
+				// However, you may also call this once, then use the message call-back.
+				QSOCK_INT32 readAvail();
+
+				// Output related:
+
+				// This command only works on servers. Clients automatically call 'sendMsg':
+				inline QSOCK_INT32 broadcastMsg(nativePort port=(nativePort)0, bool resetLength=true)
+				{
+					return handleOutputOperation(socket::broadcastMsg(outbuffer, outbufferlen, port), resetLength);
+				}
+
+				inline QSOCK_INT32 sendBroadcastMsg(nativePort port=(nativePort)0, bool resetLength=true)
+				{
+					return handleOutputOperation(broadcastMsg(port), resetLength);
+				}
+				
+				// This overload is used for raw/native IPV4 addresses.
+				inline QSOCK_INT32 sendMsg(QSOCK_UINT32_LONG IP, nativePort port = (nativePort)0, bool resetLength = true)
+				{
+					return handleOutputOperation(socket::sendMsg(outbuffer, outbufferlen, IP, port), resetLength);
+				}
+
+				// This overload is used for string IP addresses. (IPV4, IPV6)
+				inline QSOCK_INT32 sendMsg(nativeString strIP, nativePort port=(nativePort)0, bool resetLength=true)
+				{
+					return handleOutputOperation(socket::sendMsg(outbuffer, outbufferlen, strIP, port), resetLength);
+				}
+
+				inline QSOCK_INT32 sendMsg(bool resetLength=true)
+				{
+					return handleOutputOperation(socket::sendMsg(outbuffer, outbufferlen), resetLength);
+				}
+
+				inline QSOCK_INT32 sendMsg(socketAddress* outboundAddress, bool resetLength=true)
+				{
+					return handleOutputOperation(socket::sendMsg(outbuffer, outbufferlen, outboundAddress), resetLength);
 				}
 
 				// When calling this method, or calling any of the general purpose send
 				// methods, the output-offset will be restored to its default position.
-				QSOCK_INT32 outputMessage(bool resetLength=true);
+				inline QSOCK_INT32 outputMessage(bool resetLength=true)
+				{
+					return handleOutputOperation(socket::outputMessage(outbuffer, outbufferlen), resetLength);
+				}
 
-				void setTimeValues(bool init=false);
-
-				// Update methods:
-				// Nothing so far.
-
-				// Fields (Private):
-				// Nothing so far.
+				// Macros:
+				inline QSOCK_INT32 listen() { return readAvail(); }
+				inline QSOCK_INT32 update() { return readAvail(); }
 			protected:
-				// Global variable(s) (Protected):
+				// Enumerator(s):
+				enum msgState : unsigned char
+				{
+					MESSAGE_STATE_READING,
+					MESSAGE_STATE_DONE,
+					MESSAGE_STATE_WAITING,
+					MESSAGE_STATE_AVAILABLE,
+				};
 
-				// The 'file-descriptor set' used for check-timeouts.
-				static fd_set fd;
+				// Constant variable(s) (Protected):
 
-				// Constructors & Destructors:
-				bool setupObject(size_type bufferLength=0, bool fixByteOrder=true);
-				bool freeObject();
+				// The default message-polling timeout (Used for 'readAvail_Blocking', and similar functionality):
+				static const long DEFAULT_RECV_TIMEOUT_SEC = 0;
+				static const long DEFAULT_RECV_TIMEOUT_USEC = 25000; // ~250ms.
+
+				// Fields (Protected):
+				
+				// A mutex used to represent that a message has been received.
+				std::mutex packetMutex;
+				
+				// Used to block 'incomingThread' when handling this socket's internal buffer.
+				std::condition_variable incomingThreadWait;
+
+				// This is used to represent the primary input-buffer's state.
+				std::atomic<msgState> messageState = MESSAGE_STATE_WAITING;
+
+				// This specifies if callbacks should be executed remotely,
+				// rather than on an explicit check on a local thread.
+				// Please, DO NOT modify this while remote threads are running.
+				bool callbackOnRemoteThread = false;
 
 				// Methods (Protected):
 
 				// Initialization related:
-				bool bindSocket(const nativePort port);
-				qint bindInternalSocket(qint filter=-1);
+				virtual bool QSocket::bindSocket(const nativePort port) override;
 
 				// Deinitialization related:
-				inline qint shutdownInternalSocket()
+				bool closeSocket();
+
+				// Input related:
+				void readRemoteMessages(uqchar* buffer, const size_type bufferSize) override;
+
+				// Please view the 'socket' class's documentation for details.
+				virtual void onIncomingMessage(uqchar* buffer, const size_type length, const size_type bufferSize) override;
+
+				// Output related:
+				inline QSOCK_INT32 handleOutputOperation(QSOCK_INT32 responseCode, bool resetLength=true)
 				{
-					qint response;
+					if (responseCode == SOCKET_ERROR)
+						return SOCKET_ERROR; // response;
 
-					// Shutdown the internal socket.
-					response = shutdown(_socket, SD_BOTH);
+					// Flush the output-stream:
+					if (resetLength)
+						flushOutput();
 
-					if (response == 0)
-					{
-						// Set the internal socket to an "invalid socket".
-						_socket = INVALID_SOCKET;
-					}
-
-					return response;
+					// Return the calculated response.
+					return responseCode;
 				}
-
-				// Fields (Protected):
-
-				// The final address-result(s):
-
-				// 'boundAddress' points to the element of 'result' which is used to bind the internal socket.
-				#if !defined(QSOCK_IPVABSTRACT)
-					socketAddress * result, * boundAddress;
-				#else
-					addrinfo * result, * boundAddress;
-				#endif
-
-				// The hints used to evaluate addresses (Protocols, 'IP families', etc).
-				addrinfo hints;
-
-				// Internal socket:
-				#if defined(QSOCK_WINDOWS)
-					SOCKET _socket;
-				#else
-					unsigned int _socket;
-				#endif
-		
-				// Time-related field(s):
-				timeval tv;
-
-				// The connection port (Host: Local/Server port, Client: External / Remote server's port).
-				nativePort port;
-
-				// Booleans / Flags:
-
-				// Currently doesn't do much, and it's inaccessible in most places.
-				bool manualDelete;
-
-				// A boolean describing the connection-mode; server or client.
-				bool _isServer;
-
-				// A simple boolean for the state of the socket.
-				bool socketClosed;
-				bool broadcastSupported;
-
-				// Other:
-
-				/*
-				nativePort outputPort;
-				nativeIP outputIP;
-				*/
 		};
 
 		// Namespace(s) (Implementations):
@@ -1479,97 +1532,97 @@ namespace quickLib
 			// Functions:
 
 			// Input:
-			inline size_type readLengthOfString(QSocket* socket)
+			inline size_type readLengthOfString(QStream& packet)
 			{
-				return (size_type)socket->read<uqshort>();
+				return (size_type)packet.read<uqshort>();
 			}
 
-			template <typename type> inline type rawRead(QSocket* socket)
+			template <typename type> inline type rawRead(QStream& packet)
 			{
 				type data;
 			
-				socket->readData(&data, sizeof(type));
+				packet.readData(&data, sizeof(type));
 
 				return data;
 			}
 
-			template <> inline QSOCK_UCHAR rawRead<QSOCK_UCHAR>(QSocket* socket)
+			template <> inline QSOCK_UCHAR rawRead<QSOCK_UCHAR>(QStream& packet)
 			{
 				#ifndef QSOCK_THROW_EXCEPTIONS
-					if (socket->canRead(sizeof(QSOCK_UCHAR)))
+					if (packet.canRead(sizeof(QSOCK_UCHAR)))
 				#endif
 					{
 						// Hold the current read-offset.
-						auto currentOffset = socket->readOffset;
+						auto currentOffset = packet.readOffset;
 
 						// Attempt to seek forward.
-						socket->inSeekForward(sizeof(QSOCK_UCHAR));
+						packet.inSeekForward(sizeof(QSOCK_UCHAR));
 
 						// Return the requested information.
-						return (QSOCK_UCHAR)socket->inbuffer[currentOffset];
+						return (QSOCK_UCHAR)packet.inbuffer[currentOffset];
 					}
 
 				return 0;
 			}
 
-			template <typename type> inline type read(QSocket* socket)
+			template <typename type> inline type read(QStream& packet)
 			{
-				return socket->rawRead<type>();
+				return packet.rawRead<type>();
 			}
 
-			template <> inline QSOCK_UINT16 read<QSOCK_UINT16>(QSocket* socket) { return (socket->fixByteOrder) ? ntohs(socket->rawRead<QSOCK_UINT16>()) : socket->rawRead<QSOCK_UINT16>(); }
+			template <> inline QSOCK_UINT16 read<QSOCK_UINT16>(QStream& packet) { return (packet.fixByteOrder) ? ntohs(packet.rawRead<QSOCK_UINT16>()) : packet.rawRead<QSOCK_UINT16>(); }
 
-			template <> QSOCK_UINT32_LONG read<QSOCK_UINT32_LONG>(QSocket* socket)
+			template <> QSOCK_UINT32_LONG read<QSOCK_UINT32_LONG>(QStream& packet)
 			{
-				return ((socket->fixByteOrder) ? ntohl(socket->rawRead<QSOCK_UINT32_LONG>()) : socket->rawRead<QSOCK_UINT32_LONG>());
+				return ((packet.fixByteOrder) ? ntohl(packet.rawRead<QSOCK_UINT32_LONG>()) : packet.rawRead<QSOCK_UINT32_LONG>());
 			}
 
-			template <> inline QSOCK_UINT64 read<QSOCK_UINT64>(QSocket* socket) { return (socket->fixByteOrder) ? ntohll(socket->rawRead<QSOCK_UINT64>()) : socket->rawRead<QSOCK_UINT64>(); }
+			template <> inline QSOCK_UINT64 read<QSOCK_UINT64>(QStream& packet) { return (packet.fixByteOrder) ? ntohll(packet.rawRead<QSOCK_UINT64>()) : packet.rawRead<QSOCK_UINT64>(); }
 
-			template <> inline QSOCK_FLOAT32 read<QSOCK_FLOAT32>(QSocket* socket) { return (socket->fixByteOrder) ? ntohf(socket->rawRead<QSOCK_UINT32>()) : socket->rawRead<QSOCK_FLOAT32>(); }
-			template <> inline QSOCK_FLOAT64 read<QSOCK_FLOAT64>(QSocket* socket) { return (socket->fixByteOrder) ? ntohd(socket->rawRead<QSOCK_UINT64>()) : socket->rawRead<QSOCK_FLOAT64>(); }
+			template <> inline QSOCK_FLOAT32 read<QSOCK_FLOAT32>(QStream& packet) { return (packet.fixByteOrder) ? ntohf(packet.rawRead<QSOCK_UINT32>()) : packet.rawRead<QSOCK_FLOAT32>(); }
+			template <> inline QSOCK_FLOAT64 read<QSOCK_FLOAT64>(QStream& packet) { return (packet.fixByteOrder) ? ntohd(packet.rawRead<QSOCK_UINT64>()) : packet.rawRead<QSOCK_FLOAT64>(); }
 
-			template <> inline nativeString read<nativeString>(QSocket* socket)
+			template <> inline nativeString read<nativeString>(QStream& packet)
 			{
 				// Read the string's length, then the string itself.
-				return socket->readNativeString(readLengthOfString(socket));
+				return packet.readNativeString(readLengthOfString(packet));
 			}
 
 			// Wide strings are serialized and deserialized as 16-bit.
-			template <> inline std::wstring read<std::wstring>(QSocket* socket)
+			template <> inline std::wstring read<std::wstring>(QStream& packet)
 			{
-				auto length = readLengthOfString(socket);
+				auto length = readLengthOfString(packet);
 				
-				std::basic_string<QSOCK_INT16> rawString((const QSOCK_INT16*)socket->simulatedReadBytes(length*sizeof(QSOCK_INT16)), length); // uqshort // sizeof(std::wstring::value_type)
+				std::basic_string<QSOCK_INT16> rawString((const QSOCK_INT16*)packet.simulatedReadBytes(length*sizeof(QSOCK_INT16)), length); // uqshort // sizeof(std::wstring::value_type)
 
 				return std::wstring(rawString.begin(), rawString.end());
 			}
 
 			// Output:
-			inline bool writeLengthOfString(QSocket* socket, size_type length)
+			inline bool writeLengthOfString(QStream& packet, size_type length)
 			{
-				return socket->write<uqshort>((uqshort)length);
+				return packet.write<uqshort>((uqshort)length);
 			}
 
-			template <typename type> inline bool rawWrite(QSocket* socket, type data)
+			template <typename type> inline bool rawWrite(QStream& packet, type data)
 			{
-				return socket->writeData(&data, sizeof(type));
+				return packet.writeData(&data, sizeof(type));
 			}
 
-			template <> inline bool rawWrite<QSOCK_UCHAR>(QSocket* socket, QSOCK_UCHAR data)
+			template <> inline bool rawWrite<QSOCK_UCHAR>(QStream& packet, QSOCK_UCHAR data)
 			{
 				#ifndef QSOCK_THROW_EXCEPTIONS
-					if (socket->canWrite(sizeof(data)))
+					if (packet.canWrite(sizeof(data)))
 				#endif
 					{
 						// Hold the current output-offset.
-						auto currentOffset = socket->writeOffset;
+						auto currentOffset = packet.writeOffset;
 
 						// Attempt to seek forward.
-						socket->outSeekForward(sizeof(data));
+						packet.outSeekForward(sizeof(data));
 
 						// Copy the specified data.
-						socket->outbuffer[currentOffset] = (uqchar)data;
+						packet.outbuffer[currentOffset] = (uqchar)data;
 
 						// Tell the user writing was successful.
 						return true;
@@ -1578,30 +1631,30 @@ namespace quickLib
 				return false;
 			}
 
-			template <> inline bool write<QSOCK_UINT16>(QSocket* socket, QSOCK_UINT16 data) { return (socket->fixByteOrder) ? socket->rawWrite<QSOCK_UINT16>(htons(data)) : socket->rawWrite<QSOCK_UINT16>(data); }
-			template <> inline bool write<QSOCK_INT16>(QSocket* socket, QSOCK_INT16 data) { return write<QSOCK_UINT16>(socket, (QSOCK_UINT16)data); }
+			template <> inline bool write<QSOCK_UINT16>(QStream& packet, QSOCK_UINT16 data) { return (packet.fixByteOrder) ? packet.rawWrite<QSOCK_UINT16>(htons(data)) : packet.rawWrite<QSOCK_UINT16>(data); }
+			template <> inline bool write<QSOCK_INT16>(QStream& packet, QSOCK_INT16 data) { return write<QSOCK_UINT16>(packet, (QSOCK_UINT16)data); }
 
-			template <> inline bool write<QSOCK_UINT32_LONG>(QSocket* socket, QSOCK_UINT32_LONG data)
+			template <> inline bool write<QSOCK_UINT32_LONG>(QStream& packet, QSOCK_UINT32_LONG data)
 			{
-				return ((socket->fixByteOrder) ? socket->rawWrite<QSOCK_UINT32_LONG>(htonl(data)) : socket->rawWrite<QSOCK_UINT32_LONG>(data));
+				return ((packet.fixByteOrder) ? packet.rawWrite<QSOCK_UINT32_LONG>(htonl(data)) : packet.rawWrite<QSOCK_UINT32_LONG>(data));
 			}
 
-			template <> inline bool write<QSOCK_UINT64>(QSocket* socket, QSOCK_UINT64 data)
+			template <> inline bool write<QSOCK_UINT64>(QStream& packet, QSOCK_UINT64 data)
 			{
-				return socket->rawWrite<QSOCK_UINT64>((socket->fixByteOrder) ? htonll(data) : data);
+				return packet.rawWrite<QSOCK_UINT64>((packet.fixByteOrder) ? htonll(data) : data);
 			}
 
-			template <> inline bool write<QSOCK_FLOAT32>(QSocket* socket, QSOCK_FLOAT32 data) { return (socket->fixByteOrder) ? write<QSOCK_UINT32>(socket, htonf(data)) : rawWrite<QSOCK_FLOAT32>(socket, data); }
-			template <> inline bool write<QSOCK_FLOAT64>(QSocket* socket, QSOCK_FLOAT64 data) { return (socket->fixByteOrder) ? write<QSOCK_UINT64>(socket, htond(data)) : rawWrite<QSOCK_FLOAT64>(socket, data); }
+			template <> inline bool write<QSOCK_FLOAT32>(QStream& packet, QSOCK_FLOAT32 data) { return (packet.fixByteOrder) ? write<QSOCK_UINT32>(packet, htonf(data)) : rawWrite<QSOCK_FLOAT32>(packet, data); }
+			template <> inline bool write<QSOCK_FLOAT64>(QStream& packet, QSOCK_FLOAT64 data) { return (packet.fixByteOrder) ? write<QSOCK_UINT64>(packet, htond(data)) : rawWrite<QSOCK_FLOAT64>(packet, data); }
 
-			template <> inline bool write<nativeString>(QSocket* socket, nativeString str)
+			template <> inline bool write<nativeString>(QStream& packet, nativeString str)
 			{
-				return socket->write(str, lengthOfString(str));
+				return packet.write(str, lengthOfString(str));
 			}
 
-			template <> inline bool write<std::wstring>(QSocket* socket, std::wstring wstr)
+			template <> inline bool write<std::wstring>(QStream& packet, std::wstring wstr)
 			{
-				return socket->write(wstr, lengthOfString(wstr));
+				return packet.write(wstr, lengthOfString(wstr));
 			}
 		}
 	}
