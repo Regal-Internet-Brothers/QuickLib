@@ -536,7 +536,7 @@ namespace quickLib
 			// Nothing so far.
 		}
 
-		basic_socket::basic_socket(SOCKET internalSocket, bool full_control)
+		basic_socket::basic_socket(nativeSocket internalSocket, bool full_control)
 			: _socket(internalSocket), canCloseSocket(full_control)
 		{
 			// Nothing so far.

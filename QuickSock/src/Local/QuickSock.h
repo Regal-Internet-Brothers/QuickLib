@@ -296,6 +296,12 @@ namespace quickLib
 
 		socketAddress;
 
+		#if defined(QSOCK_WINDOWS)
+			typedef SOCKET nativeSocket;
+		#else
+			typedef unsigned int nativeSocket;
+		#endif
+
 		// The type used for stream locations/offset.
 		typedef size_type streamLocation;
 
@@ -1156,7 +1162,7 @@ namespace quickLib
 
 				// Constructor(s):
 				basic_socket();
-				basic_socket(SOCKET internalSocket, bool full_control=false);
+				basic_socket(nativeSocket internalSocket, bool full_control=false);
 
 				// Destructor(s):
 				virtual ~basic_socket();
@@ -1172,11 +1178,7 @@ namespace quickLib
 
 				// Internal (Don't use this unless you want platform dependent access):
 				// This command is subject to change in the future.
-				#if defined(QSOCK_WINDOWS)
-					inline SOCKET& getSocket() { return _socket; }
-				#else
-					inline unsigned int& getSocket() { return _socket; }
-				#endif
+				inline nativeSocket& getSocket() { return _socket; }
 
 				inline nativeIP msgIP() const
 				{
@@ -1283,11 +1285,7 @@ namespace quickLib
 				addrinfo hints;
 
 				// Internal socket:
-				#if defined(QSOCK_WINDOWS)
-					SOCKET _socket = INVALID_SOCKET;
-				#else
-					unsigned int _socket = INVALID_SOCKET;
-				#endif
+				nativeSocket _socket = INVALID_SOCKET;
 
 				// The connection port (Host: Local/Server port, Client: External / Remote server's port).
 				nativePort port = 0;
