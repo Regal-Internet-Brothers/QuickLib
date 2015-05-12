@@ -1461,8 +1461,17 @@ namespace quickLib
 				}
 
 				// Macros:
+
+				// This will only receive an incoming message, it will not mutate the output in any way.
 				inline QSOCK_INT32 listen() { return readAvail(); }
-				inline QSOCK_INT32 update() { return readAvail(); }
+
+				inline QSOCK_INT32 update()
+				{
+					//flushInput();
+					flushOutput();
+
+					return readAvail();
+				}
 			protected:
 				// Enumerator(s):
 				enum msgState : unsigned char
@@ -1538,9 +1547,6 @@ namespace quickLib
 				// Output related:
 				inline QSOCK_INT32 handleOutputOperation(QSOCK_INT32 responseCode, bool resetLength=true)
 				{
-					if (responseCode == SOCKET_ERROR)
-						return SOCKET_ERROR; // response;
-
 					// Flush the output-stream:
 					if (resetLength)
 						flushOutput();
