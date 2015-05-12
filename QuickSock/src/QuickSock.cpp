@@ -16,6 +16,8 @@
 	#endif
 #endif
 
+#include <iostream>
+
 #ifndef WORDS_BIGENDIAN
 	#if defined(QSOCK_WINDOWS_LEGACY) // || defined(CFG_GLFW_USE_MINGW) && defined(QSOCK_MONKEYMODE)
 		uqint htonf(const qfloat inFloat)
@@ -549,9 +551,9 @@ namespace quickLib
 		}
 
 		// Functions (Protected):
-		void basic_socket::begin_readRemoteMessages(basic_socket* instance, uqchar* buffer, const size_type bufferSize)
+		void basic_socket::begin_readRemoteMessages(basic_socket* instance, threadSwitch incomingThreadSwitch, uqchar* buffer, const size_type bufferSize, rawReceiveCallback onMessageReceived)
 		{
-			instance->readRemoteMessages(buffer, bufferSize);
+			instance->readRemoteMessages(incomingThreadSwitch, buffer, bufferSize, onMessageReceived);
 
 			return;
 		}
@@ -824,22 +826,10 @@ namespace quickLib
 		}
 
 		// Input related:
-		void basic_socket::readAvail(uqchar* buffer, const size_type bufferSize, rawReceiveCallback onMessageReceived)
+		std::thread basic_socket::readAvail(uqchar* buffer, const size_type bufferSize, threadSwitch incomingThreadSwitch, rawReceiveCallback onMessageReceived)
 		{
-			// No need to continue, we're already covered:
-			if (incomingThreadSwitch)
-				return;
-
-			// Assign the message call-back.
-			this->onMessageReceived = onMessageReceived;
-
-			// Set the "thread-switch".
-			incomingThreadSwitch = true;
-
-			// Begin executing the message-reading thread.
-			incomingThread = std::thread(begin_readRemoteMessages, this, buffer, bufferSize);
-			
-			return;
+			// Begin executing a message-reading thread.
+			return std::thread(begin_readRemoteMessages, this, incomingThreadSwitch, buffer, bufferSize, onMessageReceived);
 		}
 
 		QSOCK_INT32 basic_socket::readAvail_Blocking(uqchar* buffer, const size_type bufferSize)
@@ -861,7 +851,7 @@ namespace quickLib
 			{
 				return SOCKET_ERROR;
 			}
-	
+			
 			// Return the calculated response.
 			return response;
 		}
@@ -1099,7 +1089,7 @@ namespace quickLib
 					// Map the port agnostically to the 'result' address.
 
 					// Convert the port to a string:
-					stringstream portSStream; portSStream << internalPort;
+					std::stringstream portSStream; portSStream << internalPort;
 
 					/*
 					QSOCK_CHAR* portStr = new QSOCK_CHAR[portSStream.str().length()+1];
@@ -1244,7 +1234,7 @@ namespace quickLib
 		}
 
 		// Packet-management related:
-		void basic_socket::onIncomingMessage(uqchar* buffer, const size_type length, const size_type bufferSize)
+		void basic_socket::onIncomingMessage(uqchar* buffer, const size_type length, const size_type bufferSize, rawReceiveCallback onMessageReceived)
 		{
 			if (onMessageReceived)
 			{
@@ -1254,21 +1244,23 @@ namespace quickLib
 			return;
 		}
 
-		void basic_socket::readRemoteMessages(uqchar* buffer, const size_type bufferSize)
+		void basic_socket::readRemoteMessages(threadSwitch incomingThreadSwitch, uqchar* buffer, const size_type bufferSize, rawReceiveCallback onMessageReceived)
 		{
 			// Keep going, only if we weren't stopped:
-			while (incomingThreadSwitch)
+			while (incomingThreadSwitch.get())
 			{
 				// Check for an incoming packet:
 				auto response = readAvail_Blocking(buffer, bufferSize);
 
-				if (incomingThreadSwitch)
+				if (!incomingThreadSwitch.get())
 				{
-					// Check the response-code:
-					if (response != SOCKET_ERROR) // > 0
-					{
-						onIncomingMessage(buffer, (size_type)response, bufferSize);
-					}
+					break;
+				}
+
+				// Check the response-code:
+				if (response != SOCKET_ERROR) // > 0
+				{
+					onIncomingMessage(buffer, (size_type)response, bufferSize, onMessageReceived);
 				}
 			}
 
@@ -1277,12 +1269,15 @@ namespace quickLib
 
 		// QSocket:
 
+		// Constant variable(s):
+		const QSocket::timeMetric QSocket::DEFAULT_POLL_TIME = (timeMetric)50;
+
 		// Functions:
 		// Nothing so far.
 
 		// Constructor(s):
-		QSocket::QSocket(size_type bufferlen, bool fixByteOrder)
-			: basic_socket(), QStream(bufferlen, bufferlen, fixByteOrder), messageState(MESSAGE_STATE_WAITING)
+		QSocket::QSocket(size_type bufferlen, bool fixByteOrder, timeMetric pollTime)
+			: basic_socket(), QStream(bufferlen, bufferlen, fixByteOrder), yieldTime(pollTime), messageState(MESSAGE_STATE_WAITING)
 		{
 			#if defined(QSOCK_AUTOINIT_SOCKETS)
 				if (!initSockets())
@@ -1326,39 +1321,46 @@ namespace quickLib
 			return false;
 		}
 
+		void QSocket::releasePacket()
+		{
+			// Set the message-state accordingly.
+			messageState = MESSAGE_STATE_DONE;
+
+			// Tell the other thread we're done with the message.
+			incomingThreadWait.notify_one(); // notify_all();
+
+			return;
+		}
+
 		QSOCK_INT32 QSocket::readAvail_Blocking(uqchar* buffer, const size_type bufferSize)
 		{
 			// Call the super-class's implementation, then hold its response.
 			auto responseCode = basic_socket::readAvail_Blocking(buffer, bufferSize);
 
 			// Check if a message was read into 'inbuffer':
-			if (responseCode > 0 && buffer == inbuffer)
+			if (buffer == inbuffer)
 			{
-				// Set the internal length.
-				inbufferlen = (size_type)responseCode;
+				// Set the length and offset for the input-buffer:
+				if (responseCode > 0)
+				{
+					// Set the internal length.
+					inbufferlen = (size_type)responseCode;
+				}
+				else
+				{
+					inbufferlen = 0;
+				}
 
-				// Reset the length and offset for the input-buffer:
 				readOffset = 0;
 			}
 
 			return responseCode;
 		}
 
-		void QSocket::readAvail(uqchar* buffer, const size_type bufferSize, rawReceiveCallback onMessageReceived, bool callbackOnRemoteThread)
+		bool QSocket::readAvail(rawReceiveCallback onMessageReceived, bool callbackOnRemoteThread)
 		{
-			this->callbackOnRemoteThread = callbackOnRemoteThread;
-
-			basic_socket::readAvail(buffer, bufferSize, onMessageReceived);
-
-			return;
-		}
-
-		void QSocket::readAvail(uqchar* buffer, const size_type bufferSize, rawReceiveCallback onMessageReceived)
-		{
-			// Apply default any arguments for the main implementation.
-			readAvail(buffer, bufferSize, onMessageReceived, false);
-
-			return;
+			// Call the thread-start routine.
+			return readAvail(inbuffer, inbufferSize, onMessageReceived, callbackOnRemoteThread);
 		}
 
 		QSOCK_INT32 QSocket::readAvail()
@@ -1379,31 +1381,7 @@ namespace quickLib
 				return 0;
 			}
 
-			// Check if there's a message for us:
-			if (messageState == MESSAGE_STATE_AVAILABLE)
-			{
-				messageState = MESSAGE_STATE_READING;
-
-				// Check for a message call-back:
-				if (onMessageReceived)
-				{
-					onMessageReceived(inbuffer, inbufferlen, inbufferSize);
-				}
-
-				// Return the number of bytes read:
-				return (QSOCK_INT32)inbufferlen;
-			}
-			else if (messageState == MESSAGE_STATE_READING)
-			{
-				// Post-message cleanup:
-				messageState = MESSAGE_STATE_DONE;
-
-				// Tell the other thread we're done with the message.
-				incomingThreadWait.notify_all(); // notify_one();
-			}
-
-			// A message could not be found.
-			return 0;
+			return readAvail_Fast();
 		}
 
 		// Methods (Protected):
@@ -1432,7 +1410,7 @@ namespace quickLib
 				messageState = MESSAGE_STATE_DONE;
 
 				// Just in case another thread was waiting for us, notify them.
-				incomingThreadWait.notify_all();
+				incomingThreadWait.notify_one(); // notify_all();
 
 				// Wait until the packet-thread has finished safely.
 				incomingThread.join();
@@ -1448,21 +1426,15 @@ namespace quickLib
 		}
 
 		// Input related:
-		void QSocket::readRemoteMessages(uqchar* buffer, const size_type bufferSize)
+		void QSocket::onIncomingMessage(uqchar* buffer, const size_type length, const size_type bufferSize, rawReceiveCallback onMessageReceived)
 		{
-			// Execute the main routine.
-			basic_socket::readRemoteMessages(buffer, bufferSize);
+			//std::lock_guard<std::mutex> callbackLock(packetRetry);
 
-			return;
-		}
-
-		void QSocket::onIncomingMessage(uqchar* buffer, const size_type length, const size_type bufferSize)
-		{
 			// Check if this thread can execute call-backs:
-			if (callbackOnRemoteThread)
+			if (callbackOnRemoteThread || buffer != inbuffer)
 			{
 				// Call the super-class's implementation.
-				basic_socket::onIncomingMessage(buffer, length, bufferSize);
+				basic_socket::onIncomingMessage(buffer, length, bufferSize, onMessageReceived);
 			}
 			else
 			{
@@ -1472,6 +1444,8 @@ namespace quickLib
 				std::unique_lock<std::mutex> readerLock(packetMutex);
 
 				messageState = MESSAGE_STATE_AVAILABLE;
+
+				queryWait.notify_one(); // notify_all();
 
 				// Wait for a response from the main thread.
 				incomingThreadWait.wait(readerLock, [this] { return (messageState == MESSAGE_STATE_DONE); });
@@ -1486,6 +1460,74 @@ namespace quickLib
 			}
 
 			return;
+		}
+
+		void QSocket::readAvail(uqchar* buffer, const size_type bufferSize, threadSwitch incomingThreadSwitch, rawReceiveCallback onMessageReceived, bool callbackOnRemoteThread)
+		{
+			// Set the call-back execution-mode.
+			this->callbackOnRemoteThread = callbackOnRemoteThread;
+
+			// Call the super-class's implementation.
+			incomingThread = basic_socket::readAvail(buffer, bufferSize, incomingThreadSwitch, onMessageReceived);
+
+			return;
+		}
+
+		bool QSocket::readAvail(uqchar* buffer, const size_type bufferSize, rawReceiveCallback onMessageReceived, bool callbackOnRemoteThread)
+		{
+			if (incomingThreadSwitch)
+				return false;
+
+			// Enable the thread-switch.
+			incomingThreadSwitch = true;
+
+			readAvail(buffer, bufferSize, incomingThreadSwitch, onMessageReceived, callbackOnRemoteThread);
+
+			// Return the default response.
+			return true;
+		}
+
+		// An "unsafe" version of 'readAvail', which skips a number of safety checks.
+		QSOCK_INT32 QSocket::readAvail_Fast()
+		{
+			// Check if there's a message for us:
+			switch (messageState)
+			{
+				case MESSAGE_STATE_AVAILABLE:
+					messageState = MESSAGE_STATE_READING;
+
+					// Check for a message call-back:
+					if (onMessageReceived)
+					{
+						onMessageReceived(inbuffer, inbufferlen, inbufferSize);
+					}
+
+					// Return the number of bytes read:
+					return (QSOCK_INT32)inbufferlen;
+				case MESSAGE_STATE_READING:
+					// Release control over this packet.
+					releasePacket();
+
+					// Check if we should yield:
+					if (yieldTime != yieldTime.zero())
+					{
+						// Yield to the other thread, then check if it still has something:
+						//std::this_thread::sleep_for(yieldTime);
+
+						std::unique_lock<std::mutex> packetWait(packetRetry);
+
+						// Check if we have another packet:
+						if (queryWait.wait_for(packetWait, yieldTime, [this] { return messageState == MESSAGE_STATE_AVAILABLE; }))
+						{
+							return readAvail();
+						}
+					}
+
+					//break;
+			}
+
+			// A message could not be found.
+			return 0;
 		}
 	}
 }

@@ -20,6 +20,8 @@
 	#define qthrow(X)
 #endif
 
+//#define QSOCK_IPVABSTRACT
+
 #if !defined(QSOCK_IPVABSTRACT)
 	// This allows the IPV4-backend to resolve hostnames.
 	// Using this may cause extra overhead, but this isn't
@@ -370,7 +372,7 @@ namespace quickLib
 				// Local variable(s):
 				QSOCK_INT32 temp(1);
 
-				return ((*(char*)&temp) != 1);
+				return ((*(qchar*)&temp) != 1);
 			#endif
 		}
 
@@ -1095,6 +1097,9 @@ namespace quickLib
 				// The input-buffer, the amount used from that buffer, and the maximum size of the buffer.
 				typedef std::function<void(uqchar*, size_type, size_type)> rawReceiveCallback;
 
+				typedef std::atomic<bool> threadToggle;
+				typedef const std::reference_wrapper<threadToggle> threadSwitch; // const std::atomic<bool>&
+
 				// Global variable(s):
 
 				// A global boolean stating if sockets have been initialized or not.
@@ -1157,7 +1162,11 @@ namespace quickLib
 
 				static inline nativeString representIP(nativeIP input)
 				{
-					return nativeToNonNativeIP(input);
+					#if !defined(QSOCK_IPVABSTRACT)
+						return nativeToNonNativeIP(input); // (nativeString)
+					#else
+						return input; // (nativeString)
+					#endif
 				}
 
 				// Constructor(s):
@@ -1217,7 +1226,7 @@ namespace quickLib
 				// Input related:
 
 				// This is the preferred overload for call-back-based message detection.
-				virtual void readAvail(uqchar* buffer, const size_type bufferSize, rawReceiveCallback onMessageReceived);
+				std::thread readAvail(uqchar* buffer, const size_type bufferSize, threadSwitch incomingThreadSwitch, rawReceiveCallback onMessageReceived=rawReceiveCallback());
 
 				// This acts as the primary implementation for 'readAvail'.
 				// The current system used is partially asynchronous.
@@ -1266,7 +1275,7 @@ namespace quickLib
 
 				// This should be used to call 'readRemoteMessages' from another thread.
 				// This will not create a new thread, but it will act as an easy to use entry-point.
-				static void begin_readRemoteMessages(basic_socket* instance, uqchar* buffer, const size_type bufferSize);
+				static void begin_readRemoteMessages(basic_socket* instance, threadSwitch incomingThreadSwitch, uqchar* buffer, const size_type bufferSize, rawReceiveCallback onMessageReceived=rawReceiveCallback());
 
 				// Fields (Protected):
 
@@ -1290,12 +1299,6 @@ namespace quickLib
 				// The connection port (Host: Local/Server port, Client: External / Remote server's port).
 				nativePort port = 0;
 
-				// A thread dedicated to waiting for (And potentially reading) inbound packets.
-				std::thread incomingThread;
-
-				// A call-back for packet/message notifications.
-				rawReceiveCallback onMessageReceived;
-
 				// Booleans / Flags:
 
 				// A boolean describing the connection-mode; server or client.
@@ -1309,9 +1312,6 @@ namespace quickLib
 
 				// This specifies if broadcasting is supported by this socket.
 				bool broadcastSupported = false;
-
-				// A boolean used to manually close 'incomingThread'.
-				std::atomic<bool> incomingThreadSwitch;
 
 				// Methods (Protected):
 
@@ -1340,10 +1340,10 @@ namespace quickLib
 				// Packet-management related:
 
 				// This is called every time a packet/message is received from 'incomingThread'.
-				virtual void onIncomingMessage(uqchar* buffer, const size_type length, const size_type bufferSize);
+				virtual void onIncomingMessage(uqchar* buffer, const size_type length, const size_type bufferSize, rawReceiveCallback onMessageReceived=rawReceiveCallback());
 
 				// This acts as the entry-point for asynchronous message reading.
-				virtual void readRemoteMessages(uqchar* buffer, const size_type bufferSize);
+				void readRemoteMessages(threadSwitch incomingThreadSwitch, uqchar* buffer, const size_type bufferSize, rawReceiveCallback onMessageReceived=rawReceiveCallback());
 
 				// This will output the buffer specified to this socket's destination.
 				QSOCK_INT32 outputMessage(uqchar* outputBuffer, size_type outputBufferLength);
@@ -1374,18 +1374,26 @@ namespace quickLib
 		class QSocket : public basic_socket, public QStream
 		{
 			public:
+				// Typedefs:
+				typedef std::chrono::microseconds timeMetric;
+
 				// Constant variable(s):
 
 				// The default max buffer-length for sockets.
 				static const size_type DEFAULT_BUFFERLEN = 1024;
 
-				// Fields (Public):
+				static const timeMetric DEFAULT_POLL_TIME;
 
 				// Constructor(s):
-				QSocket(size_type bufferLength=DEFAULT_BUFFERLEN, bool fixByteOrder=true);
+				QSocket(size_type bufferLength=DEFAULT_BUFFERLEN, bool fixByteOrder=true, timeMetric pollTime=(timeMetric)DEFAULT_POLL_TIME);
 
 				// Destructor(s):
 				~QSocket();
+
+				// Fields (Public):
+
+				// The maximum amount of time yielded to wait for 'incomingThread', when calling 'readAvail' (Or similar).
+				timeMetric yieldTime;
 
 				// Methods (Public):
 
@@ -1397,21 +1405,13 @@ namespace quickLib
 				// This method is no longer 'const'.
 				bool msgAvail();
 
+				// This may be used to manually release control over a packet.
+				void releasePacket();
+
 				virtual QSOCK_INT32 readAvail_Blocking(uqchar* buffer, const size_type bufferSize) override;
 
-				// This is the preferred overload for call-back-based message detection.
-				// The 'callbackOnRemoteThread' argument specifies if the call-back
-				// will be executed remotely, or when the main 'readAvail' overload is called.
-				void readAvail(uqchar* buffer, const size_type bufferSize, rawReceiveCallback onMessageReceived, bool callbackOnRemoteThread);
-				virtual void readAvail(uqchar* buffer, const size_type bufferSize, rawReceiveCallback onMessageReceived) override;
-
-				inline void readAvail(rawReceiveCallback onMessageReceived, bool callbackOnRemoteThread)
-				{
-					// Call the thread-start routine.
-					readAvail(inbuffer, inbufferSize, onMessageReceived, callbackOnRemoteThread);
-
-					return;
-				}
+				// This may be used to begin execution of an internally managed message-thread.
+				bool readAvail(rawReceiveCallback onMessageReceived, bool callbackOnRemoteThread);
 
 				// This acts as the front-end for the main message-detection routine.
 				// This may be called continuously in order to read packets.
@@ -1483,17 +1483,32 @@ namespace quickLib
 				
 				// A mutex used to represent that a message has been received.
 				std::mutex packetMutex;
+
+				// This is used to wait temporarily for 'incomingThread'.
+				std::mutex packetRetry;
 				
-				// Used to block 'incomingThread' when handling this socket's internal buffer.
+				// This is used to block 'incomingThread' when handling this socket's internal buffer.
 				std::condition_variable incomingThreadWait;
+
+				// This is used to temporarily block the detecting (Main) thread.
+				std::condition_variable queryWait;
 
 				// This is used to represent the primary input-buffer's state.
 				std::atomic<msgState> messageState;
+
+				// The callback that's executed every time a message is received.
+				rawReceiveCallback onMessageReceived;
 
 				// This specifies if callbacks should be executed remotely,
 				// rather than on an explicit check on a local thread.
 				// Please, DO NOT modify this while remote threads are running.
 				bool callbackOnRemoteThread = false;
+
+				// A boolean used to manually close 'incomingThread'.
+				std::atomic<bool> incomingThreadSwitch;
+
+				// A thread dedicated to waiting for (And potentially reading) inbound packets.
+				std::thread incomingThread;
 
 				// Methods (Protected):
 
@@ -1504,10 +1519,21 @@ namespace quickLib
 				bool closeSocket();
 
 				// Input related:
-				void readRemoteMessages(uqchar* buffer, const size_type bufferSize) override;
 
 				// Please view the 'basic_socket' class's documentation for details.
-				virtual void onIncomingMessage(uqchar* buffer, const size_type length, const size_type bufferSize) override;
+				virtual void onIncomingMessage(uqchar* buffer, const size_type length, const size_type bufferSize, rawReceiveCallback onMessageReceived=rawReceiveCallback()) override;
+				
+				// This acts as the underlying overload which sets up the internally managed message-thread.
+				// This is considered "unsafe", as it doesn't check the integrity of the operation (Internally stored thread-switch).
+				// The arguments passed to this overload should be completely under this class's control.
+				void readAvail(uqchar* buffer, const size_type bufferSize, threadSwitch incomingThreadSwitch, rawReceiveCallback onMessageReceived, bool callbackOnRemoteThread);
+
+				// This will launch the internal message-thread, if not already started.
+				// The return-value indicates if operations were successful.
+				bool readAvail(uqchar* buffer, const size_type bufferSize, rawReceiveCallback onMessageReceived, bool callbackOnRemoteThread);
+
+				// An "unsafe" version of 'readAvail', which skips a number of safety checks. (Non-blocking)
+				QSOCK_INT32 readAvail_Fast();
 
 				// Output related:
 				inline QSOCK_INT32 handleOutputOperation(QSOCK_INT32 responseCode, bool resetLength=true)
