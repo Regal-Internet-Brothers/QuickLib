@@ -547,7 +547,7 @@ namespace quickLib
 		// Destructor(s):
 		basic_socket::~basic_socket()
 		{
-			closeSocket();
+			closeSocket(true);
 		}
 
 		// Functions (Protected):
@@ -694,9 +694,9 @@ namespace quickLib
 		}
 
 		// Deinitialization related:
-		bool basic_socket::close()
+		bool basic_socket::close(bool blockIfNeeded)
 		{
-			return closeSocket();
+			return closeSocket(blockIfNeeded);
 		}
 
 		bool basic_socket::setupDestinationV4(QSOCK_UINT32_LONG address, nativePort externalPort)
@@ -970,7 +970,16 @@ namespace quickLib
 
 				if (recvTimeout != nullptr)
 				{
-					setsockopt(_socket, SOL_SOCKET, SO_RCVTIMEO, (const char*)recvTimeout, sizeof(timeval));
+					#if defined(QSOCK_WINDOWS)
+						DWORD timeOutInMS = ((recvTimeout->tv_sec*1000) + (recvTimeout->tv_usec / 1000));
+						
+						if (timeOutInMS > 0)
+						{
+							setsockopt(_socket, SOL_SOCKET, SO_RCVTIMEO, (const char*)&timeOutInMS, sizeof(DWORD));
+						}
+					#else
+						setsockopt(_socket, SOL_SOCKET, SO_RCVTIMEO, (const char*)recvTimeout, sizeof(timeval));
+					#endif
 				}
 
 				bindResult = ::bind(_socket, (const sockaddr*)boundAddress, sizeof(socketAddress));
@@ -1136,10 +1145,10 @@ namespace quickLib
 					boundAddress = result;
 
 					// Bind the socket, using the address 'boundAddress' is pointing to.
-					bindResult = bindInternalSocket();
+					bindResult = bindInternalSocket(nativeFilter, nativeRecvTimeout);
 				#else
 					// Try IPV6 before attempting to use any protocol.
-					bindResult = bindInternalSocket(AF_INET6);
+					bindResult = bindInternalSocket(AF_INET6); // nativeFilter
 
 					// We weren't able to use IPV6, try any protocol:
 					if (bindResult != 0)
@@ -1152,7 +1161,7 @@ namespace quickLib
 				if (_socket == INVALID_SOCKET)
 				{
 					// Close the internal socket.
-					close(); // closeSocket();
+					close(false); // closeSocket();
 
 					return false;
 				}
@@ -1161,7 +1170,7 @@ namespace quickLib
 				if (bindResult == SOCKET_ERROR)
 				{
 					// Close the internal socket.
-					close(); // closeSocket();
+					close(false); // closeSocket();
 
 					// Return a negative response.
 					return false;
@@ -1188,7 +1197,7 @@ namespace quickLib
 			return bindSocket(port, -1, nullptr);
 		}
 
-		bool basic_socket::closeSocket()
+		bool basic_socket::closeSocket(bool blockIfNeeded)
 		{
 			// Check if this socket has been closed already:
 			if (socketClosed)
@@ -1293,20 +1302,20 @@ namespace quickLib
 		QSocket::~QSocket()
 		{
 			// Call our local close-routine.
-			QSocket::closeSocket();
+			QSocket::closeSocket(true);
 		}
 
 		// Methods (Public):
 
 		// Deinitialization related:
-		bool QSocket::close()
+		bool QSocket::close(bool blockIfNeeded)
 		{
 			// Call the super-class's implementation.
-			if (!basic_socket::close())
+			if (!basic_socket::close(blockIfNeeded))
 				return false;
 
 			// Call our own implementation.
-			return QSocket::closeSocket();
+			return QSocket::closeSocket(blockIfNeeded);
 		}
 
 		// Input related:
@@ -1400,7 +1409,7 @@ namespace quickLib
 		}
 
 		// Deinitialization related:
-		bool QSocket::closeSocket()
+		bool QSocket::closeSocket(bool blockIfNeeded)
 		{
 			if (incomingThreadSwitch)
 			{
@@ -1412,9 +1421,12 @@ namespace quickLib
 				// Just in case another thread was waiting for us, notify them.
 				incomingThreadWait.notify_one(); // notify_all();
 
-				// Wait until the packet-thread has finished safely.
-				incomingThread.join();
-				//incomingThread.detach();
+				if (blockIfNeeded)
+				{
+					// Wait until the packet-thread has finished safely.
+					incomingThread.join();
+					//incomingThread.detach();
+				}
 
 				//packetResponseMutex.unlock();
 

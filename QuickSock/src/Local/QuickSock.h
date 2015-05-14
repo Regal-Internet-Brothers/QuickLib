@@ -1269,7 +1269,7 @@ namespace quickLib
 				}
 
 				// Deinitialization related:
-				virtual bool close();
+				virtual bool close(bool blockIfNeeded=true);
 			protected:
 				// Functions (Protected):
 
@@ -1335,7 +1335,7 @@ namespace quickLib
 					return response;
 				}
 
-				bool closeSocket();
+				bool closeSocket(bool blockIfNeeded=true);
 
 				// Packet-management related:
 
@@ -1398,7 +1398,7 @@ namespace quickLib
 				// Methods (Public):
 
 				// Deinitialization related:
-				virtual bool close() override;
+				virtual bool close(bool blockIfNeeded=true) override;
 
 				// Input related:
 
@@ -1484,9 +1484,10 @@ namespace quickLib
 
 				// Constant variable(s) (Protected):
 
-				// The default message-polling timeout (Used for 'readAvail_Blocking', and similar functionality):
+				// The default message-polling timeout. This is used for 'readAvail_Blocking', and similar functionality.
+				// This must be at least one millisecond in length (Windows limitation):
 				static const long DEFAULT_RECV_TIMEOUT_SEC = 0;
-				static const long DEFAULT_RECV_TIMEOUT_USEC = 25000; // ~250ms.
+				static const long DEFAULT_RECV_TIMEOUT_USEC = 100000; // ~100ms.
 
 				// Fields (Protected):
 				
@@ -1525,7 +1526,7 @@ namespace quickLib
 				virtual bool bindSocket(const nativePort port) override;
 
 				// Deinitialization related:
-				bool closeSocket();
+				bool closeSocket(bool blockIfNeeded=true);
 
 				// Input related:
 
