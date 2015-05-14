@@ -1467,12 +1467,6 @@ namespace quickLib
 				// Wait for a response from the main thread.
 				incomingThreadWait.wait(readerLock, [this] { return (messageState == MESSAGE_STATE_DONE); });
 
-				// Make sure we can continue:
-				if (!incomingThreadSwitch)
-				{
-					return;
-				}
-
 				messageState = MESSAGE_STATE_WAITING;
 			}
 
