@@ -1279,7 +1279,7 @@ namespace quickLib
 		// QSocket:
 
 		// Constant variable(s):
-		const QSocket::timeMetric QSocket::DEFAULT_POLL_TIME = (timeMetric)50;
+		const QSocket::timeMetric QSocket::DEFAULT_POLL_TIME = (timeMetric)10; // 50;
 
 		// Functions:
 		// Nothing so far.
@@ -1372,7 +1372,7 @@ namespace quickLib
 			return readAvail(inbuffer, inbufferSize, onMessageReceived, callbackOnRemoteThread);
 		}
 
-		QSOCK_INT32 QSocket::readAvail()
+		QSOCK_INT32 QSocket::readAvail(bool yieldTemporarily)
 		{
 			// Ensure we're operating in the proper environment:
 			if (callbackOnRemoteThread)
@@ -1390,7 +1390,7 @@ namespace quickLib
 				return 0;
 			}
 
-			return readAvail_Fast();
+			return readAvail_Fast(yieldTemporarily);
 		}
 
 		// Methods (Protected):
@@ -1411,6 +1411,11 @@ namespace quickLib
 		// Deinitialization related:
 		bool QSocket::closeSocket(bool blockIfNeeded)
 		{
+			/*
+			if (socketClosed)
+				return false;
+			*/
+
 			if (incomingThreadSwitch)
 			{
 				// Set the incoming-thread switch to 'false'.
@@ -1500,7 +1505,7 @@ namespace quickLib
 		}
 
 		// An "unsafe" version of 'readAvail', which skips a number of safety checks.
-		QSOCK_INT32 QSocket::readAvail_Fast()
+		QSOCK_INT32 QSocket::readAvail_Fast(bool yieldTemporarily)
 		{
 			// Check if there's a message for us:
 			switch (messageState)
@@ -1521,21 +1526,24 @@ namespace quickLib
 					releasePacket();
 
 					// Check if we should yield:
-					if (yieldTime != yieldTime.zero())
+					if (yieldTemporarily)
 					{
-						// Yield to the other thread, then check if it still has something:
-						//std::this_thread::sleep_for(yieldTime);
-
-						std::unique_lock<std::mutex> packetWait(packetRetry);
-
-						// Check if we have another packet:
-						if (queryWait.wait_for(packetWait, yieldTime, [this] { return messageState == MESSAGE_STATE_AVAILABLE; }))
+						if (yieldTime != yieldTime.zero())
 						{
-							return readAvail();
+							// Yield to the other thread, then check if it still has something:
+							//std::this_thread::sleep_for(yieldTime);
+
+							std::unique_lock<std::mutex> packetWait(packetRetry);
+
+							// Check if we have another packet:
+							if (queryWait.wait_for(packetWait, yieldTime, [this] { return messageState == MESSAGE_STATE_AVAILABLE; }))
+							{
+								return readAvail_Fast(yieldTemporarily);
+							}
 						}
 					}
 
-					//break;
+					break;
 			}
 
 			// A message could not be found.

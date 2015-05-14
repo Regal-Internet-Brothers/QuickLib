@@ -1416,7 +1416,7 @@ namespace quickLib
 				// This acts as the front-end for the main message-detection routine.
 				// This may be called continuously in order to read packets.
 				// However, you may also call this once, then use the message call-back.
-				QSOCK_INT32 readAvail();
+				QSOCK_INT32 readAvail(bool yieldTemporarily=true);
 
 				// Output related:
 
@@ -1463,14 +1463,14 @@ namespace quickLib
 				// Macros:
 
 				// This will only receive an incoming message, it will not mutate the output in any way.
-				inline QSOCK_INT32 listen() { return readAvail(); }
+				inline QSOCK_INT32 listen(bool yieldTemporarily=true) { return readAvail(yieldTemporarily); }
 
-				inline QSOCK_INT32 update()
+				inline QSOCK_INT32 update(bool yieldTemporarily=true)
 				{
 					//flushInput();
 					flushOutput();
 
-					return readAvail();
+					return readAvail(yieldTemporarily);
 				}
 			protected:
 				// Enumerator(s):
@@ -1543,7 +1543,7 @@ namespace quickLib
 				bool readAvail(uqchar* buffer, const size_type bufferSize, rawReceiveCallback onMessageReceived, bool callbackOnRemoteThread);
 
 				// An "unsafe" version of 'readAvail', which skips a number of safety checks. (Non-blocking)
-				QSOCK_INT32 readAvail_Fast();
+				QSOCK_INT32 readAvail_Fast(bool yieldTemporarily=true);
 
 				// Output related:
 				inline QSOCK_INT32 handleOutputOperation(QSOCK_INT32 responseCode, bool resetLength=true)
