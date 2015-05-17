@@ -1261,10 +1261,12 @@ namespace quickLib
 				// Check for an incoming packet:
 				auto response = readAvail_Blocking(buffer, bufferSize);
 
+				/*
 				if (!incomingThreadSwitch.get())
 				{
 					break;
 				}
+				*/
 
 				// Check the response-code:
 				if (response != SOCKET_ERROR) // > 0
@@ -1321,6 +1323,8 @@ namespace quickLib
 		// Input related:
 		bool QSocket::msgAvail()
 		{
+			std::lock_guard<std::mutex> stateLock(packetMutex);
+
 			if (messageState == MESSAGE_STATE_READING)
 			{
 				return canRead();
@@ -1328,17 +1332,6 @@ namespace quickLib
 
 			// Return the default response.
 			return false;
-		}
-
-		void QSocket::releasePacket()
-		{
-			// Set the message-state accordingly.
-			messageState = MESSAGE_STATE_DONE;
-
-			// Tell the other thread we're done with the message.
-			incomingThreadWait.notify_one(); // notify_all();
-
-			return;
 		}
 
 		QSOCK_INT32 QSocket::readAvail_Blocking(uqchar* buffer, const size_type bufferSize)
@@ -1421,7 +1414,11 @@ namespace quickLib
 				// Set the incoming-thread switch to 'false'.
 				incomingThreadSwitch = false;
 
+				std::unique_lock<std::mutex> waitLock(packetMutex);
+				
 				messageState = MESSAGE_STATE_DONE;
+
+				waitLock.unlock();
 
 				// Just in case another thread was waiting for us, notify them.
 				incomingThreadWait.notify_one(); // notify_all();
@@ -1432,10 +1429,6 @@ namespace quickLib
 					incomingThread.join();
 					//incomingThread.detach();
 				}
-
-				//packetResponseMutex.unlock();
-
-				//packetMutex.unlock();
 			}
 
 			// Return the default response.
@@ -1462,7 +1455,7 @@ namespace quickLib
 
 				messageState = MESSAGE_STATE_AVAILABLE;
 
-				queryWait.notify_one(); // notify_all();
+				incomingThreadWait.notify_one(); // notify_all(); // queryWait
 
 				// Wait for a response from the main thread.
 				incomingThreadWait.wait(readerLock, [this] { return (messageState == MESSAGE_STATE_DONE); });
@@ -1501,6 +1494,8 @@ namespace quickLib
 		// An "unsafe" version of 'readAvail', which skips a number of safety checks.
 		QSOCK_INT32 QSocket::readAvail_Fast(bool yieldTemporarily)
 		{
+			std::unique_lock<std::mutex> stateLock(packetMutex);
+
 			// Check if there's a message for us:
 			switch (messageState)
 			{
@@ -1517,7 +1512,12 @@ namespace quickLib
 					return (QSOCK_INT32)inbufferlen;
 				case MESSAGE_STATE_READING:
 					// Release control over this packet.
-					releasePacket();
+
+					// Set the message-state accordingly.
+					messageState = MESSAGE_STATE_DONE;
+
+					// Tell the other thread we're done with the message.
+					incomingThreadWait.notify_one(); // notify_all();
 
 					// Check if we should yield:
 					if (yieldTemporarily)
@@ -1527,11 +1527,11 @@ namespace quickLib
 							// Yield to the other thread, then check if it still has something:
 							//std::this_thread::sleep_for(yieldTime);
 
-							std::unique_lock<std::mutex> packetWait(packetRetry);
-
 							// Check if we have another packet:
-							if (queryWait.wait_for(packetWait, yieldTime, [this] { return messageState == MESSAGE_STATE_AVAILABLE; }))
+							if (incomingThreadWait.wait_for(stateLock, yieldTime, [this] { return messageState == MESSAGE_STATE_AVAILABLE; })) // == std::cv_status::no_timeout // queryWait
 							{
+								stateLock.unlock();
+
 								return readAvail_Fast(yieldTemporarily);
 							}
 						}

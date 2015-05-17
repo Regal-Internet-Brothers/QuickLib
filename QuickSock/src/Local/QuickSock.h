@@ -1405,9 +1405,6 @@ namespace quickLib
 				// This method is no longer 'const'.
 				bool msgAvail();
 
-				// This may be used to manually release control over a packet.
-				void releasePacket();
-
 				virtual QSOCK_INT32 readAvail_Blocking(uqchar* buffer, const size_type bufferSize) override;
 
 				// This may be used to begin execution of an internally managed message-thread.
@@ -1491,20 +1488,14 @@ namespace quickLib
 
 				// Fields (Protected):
 				
-				// A mutex used to represent that a message has been received.
+				// A mutex used to safely handle the internal input-buffer.
 				std::mutex packetMutex;
-
-				// This is used to wait temporarily for 'incomingThread'.
-				std::mutex packetRetry;
 				
-				// This is used to block 'incomingThread' when handling this socket's internal buffer.
+				// This is used to send notifications to and from 'incomingThread'.
 				std::condition_variable incomingThreadWait;
 
-				// This is used to temporarily block the detecting (Main) thread.
-				std::condition_variable queryWait;
-
 				// This is used to represent the primary input-buffer's state.
-				std::atomic<msgState> messageState;
+				msgState messageState; // std::atomic<msgState>
 
 				// The callback that's executed every time a message is received.
 				rawReceiveCallback onMessageReceived;
