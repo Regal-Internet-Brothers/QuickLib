@@ -16,9 +16,10 @@
 // Includes:
 #include <stdexcept>
 #include <algorithm>
-#include <functional>
+//#include <functional>
 
 #include <string>
+#include <functional>
 
 #include <cctype>
 
@@ -176,6 +177,61 @@ namespace quickLib
 		inline str trim(str s)
 		{
 			return rtrim(ltrim(s));
+		}
+
+		/*
+		enum symbols : INISectionTag::value_type // char
+		{
+			assignmentSymbol = '=',
+			commentSymbol = ';',
+			sectionBeginSymbol = '[',
+			sectionEndSymbol = ']',
+		};
+		*/
+
+		template<typename characterType=char, typename callbackType, typename characterTraits=char_traits<characterType>, typename strAlloc=allocator<characterType>>
+		inline void parseArray
+		(
+			const basic_string<characterType, characterTraits, strAlloc>& entries,
+			callbackType&& callback,
+			characterType separator='|'
+		)
+		{
+			// Typedefs:
+			typedef basic_string<characterType, characterTraits, strAlloc> strType;
+
+			for
+			(
+				// Calculate the start of the first number:
+				strType::size_type entryLocation = ((entryLocation = entries.find(sectionBeginSymbol)) != strType::npos) ? (entryLocation+1) : 0;
+							
+				// Ensure the next number-location isn't at the end of the string:
+				entryLocation != strType::npos && entryLocation < entries.length();
+			)
+			{
+				// Calculate the edge of the current number:
+				auto edge = entries.find(separator, entryLocation);
+
+				if (edge == strType::npos)
+				{
+					// We were unable to find a separator, look for the scope-end symbol:
+					edge = entries.find(sectionEndSymbol, entryLocation);
+
+					if (edge == strType::npos)
+					{
+						// When all else fails, the edge will be the end of the string.
+						edge = entries.length();
+					}
+				}
+
+				// This will act as the current entry in the "array" of processes.
+				callback(entries.substr(entryLocation, edge-entryLocation));
+
+				// Move to the starting point of the next entry.
+				entryLocation = edge+1;
+			}
+
+			return;
 		}
 
 		// Classes:

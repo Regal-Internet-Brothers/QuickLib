@@ -8,6 +8,8 @@
 	#include <QuickLib/QuickINI/QuickINI.h>
 #endif
 
+//#include <functional>
+
 int main()
 {
 	// Namespace(s):
@@ -48,6 +50,8 @@ int main()
 	cout << "------------------------" << endl << endl;
 
 	INI::write(wcout, data, true);
+
+	INI::parseArray((string)"[Hello|world|this|is|a|test]", [] (const string& str) { cout << "ENTRY: " << str << endl; });
 
 	system("PAUSE");
 
